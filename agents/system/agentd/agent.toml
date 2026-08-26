@@ -1,0 +1,29 @@
+[agent]
+name       = "agentd"
+tier       = "system"
+domain     = "registry, discovery, capability brokering, supervision"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+# agentd brokers model calls; it does not make them. Holding a model grant
+# would let the thing that enforces grants quietly use one.
+models = []
+tools  = []
+skills = []
+peers  = []
+
+[quota]
+memory = "256Mi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "The only process that knows where anything is. Agents hold manifests; agentd holds addresses."
+skills      = ["system.registry", "system.discover", "system.broker"]
+inputs      = "ndjson/unix-socket"
+outputs     = "ndjson/unix-socket"
+
+[evolution]
+mode   = "frozen"     # the thing that enforces the rules does not rewrite itself
+allow  = []
+review = "required"

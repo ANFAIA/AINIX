@@ -18,10 +18,11 @@ def main() raises:
     var model = agent.model("gemma-3-1b")
 
     while True:
+        # A task is a plain dict over the wire, so it is indexed, not attributed.
         var task = agent.next_task()
         if not task:
             break
         # thinking=False matters: a reasoning model otherwise spends the whole
         # budget in reasoning_content and returns an empty contract.
         agent.reply(task, model.complete_json(
-            system=SYSTEM, user=task.input, thinking=False))
+            system=SYSTEM, user=task["input"], thinking=False))

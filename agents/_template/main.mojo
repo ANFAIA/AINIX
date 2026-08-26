@@ -20,7 +20,8 @@ def main() raises:
     var model = agent.model("gemma-3-1b")
 
     while True:
+        # A task is a plain dict over the wire, so it is indexed, not attributed.
         var task = agent.next_task()      # blocks; None when shutting down
         if not task:
             break
-        agent.reply(task, model.complete(task.input))
+        agent.reply(task, model.complete(task["input"]))
