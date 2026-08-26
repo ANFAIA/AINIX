@@ -6,3 +6,4 @@ models/
 build/
 result
 result-*
+.env.local

@@ -241,6 +241,15 @@ key_env  = "OPENROUTER_API_KEY"
 enabled  = false
 role     = "Nemotron 3 Super 120B — free, cheap failover for simple intents"
 
+[remote.qwen38-local]
+provider   = "openai-compatible"
+base_url   = "https://dfa2-136-85-24-0.ngrok-free.app/v1"
+model      = "qwen3.8:27b"
+key_env    = "AINIX_TEACHER_KEY"     # value lives in .env.local, never here
+enabled    = false
+max_tokens = 1200
+role       = "Qwen3.8 27B on a private endpoint — lead distillation teacher; a reasoning model, so it needs room to think before it answers"
+
 [remote.openrouter-auto]
 provider = "openrouter"
 base_url = "https://openrouter.ai/api/v1"

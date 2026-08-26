@@ -56,8 +56,12 @@ Rules:
 # Ordered by how good the answers are, not alphabetically: ask_any prefers
 # whichever is not rate-limited, so a wide pool turns a 429 into a handoff
 # instead of a stall.
-TEACHERS = ["remote.minimax-m3", "remote.glm-5-2", "remote.nemotron-3-ultra",
-            "remote.gemma-4-31b", "remote.inkling", "remote.nemotron-super"]
+# Lead teacher first: ask_any prefers whichever is not cooling, and the
+# private endpoint has no rate limit, so the free pool is failover rather than
+# the main source.
+TEACHERS = ["remote.qwen38-local", "remote.minimax-m3", "remote.glm-5-2",
+            "remote.nemotron-3-ultra", "remote.gemma-4-31b", "remote.inkling",
+            "remote.nemotron-super"]
 
 _print_lock = threading.Lock()
 

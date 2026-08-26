@@ -127,7 +127,8 @@ def load_teacher(name: str) -> dict:
         key = os.environ.get(entry["key_env"])
         if not key:
             sys.exit(f"{entry['key_env']} is not set — needed for {name}")
-        return {"base_url": entry["base_url"], "model": entry["model"], "key": key}
+        return {"base_url": entry["base_url"], "model": entry["model"],
+                "key": key, "max_tokens": entry.get("max_tokens")}
 
     # A local runner: whatever is serving on this port speaks the same API.
     return {
@@ -200,11 +201,18 @@ def _retry_after(e) -> float | None:
 
 def ask(teacher: dict, prompt: str, timeout: int = 180,
         retries: int = 6, quiet: bool = False) -> str:
-    body = json.dumps({
+    payload = {
         "model": teacher["model"],
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7,
-    }).encode()
+    }
+    # A reasoning model spends its budget thinking and returns an empty
+    # `content` unless there is room left over for the answer. This endpoint
+    # ignores both `think: false` and `chat_template_kwargs`, so the only
+    # lever is a budget big enough for both.
+    if teacher.get("max_tokens"):
+        payload["max_tokens"] = teacher["max_tokens"]
+    body = json.dumps(payload).encode()
     headers = {"Content-Type": "application/json"}
     if teacher["key"]:
         headers["Authorization"] = f"Bearer {teacher['key']}"
@@ -220,7 +228,10 @@ def ask(teacher: dict, prompt: str, timeout: int = 180,
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 _forgive(model)
-                return json.load(resp)["choices"][0]["message"]["content"]
+                m = json.load(resp)["choices"][0]["message"]
+                # Fall back to the chain of thought only if the answer is
+                # empty — some servers put a truncated answer there.
+                return m.get("content") or m.get("reasoning") or ""
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 w = _penalise(model, _retry_after(e))
