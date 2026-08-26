@@ -9,6 +9,9 @@ entrypoint = "main.mojo"
 # reason to, and giving the setup agent inference access would be backwards.
 models = []
 tools  = []
+
+# Skills this agent loads. Must be at a level its tier can see.
+skills = []
 peers  = []
 
 [quota]

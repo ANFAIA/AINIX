@@ -1,0 +1,8 @@
+[skill]
+name        = "manage-runner"
+level       = "system"
+version     = "0.1.0"
+description = "Start, stop, and switch the model runners that back every agent."
+requires_tools  = ["podman"]
+requires_models = []
+protected   = false

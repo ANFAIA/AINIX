@@ -9,6 +9,9 @@ import tomllib
 from pathlib import Path
 
 TIERS = {"user", "app", "system"}
+# Skill levels, top (least privileged) to bottom (most privileged). A tier sees
+# its own level and every level above it — see scripts/skillctl.py.
+SKILL_LEVELS = ["user", "app", "system"]
 # Callable-from rules: who is allowed to name whom as a peer.
 CALLABLE = {"user": {"app"}, "app": {"app"}, "system": {"user", "app", "system"}}
 EVOLUTION_MODES = {"self", "parent", "frozen"}
@@ -19,6 +22,10 @@ IMMUTABLE_FIELDS = {"tier", "quota", "models", "tools", "peers"}
 def load(path: Path) -> dict:
     with path.open("rb") as fh:
         return tomllib.load(fh)
+
+
+def visible_skill_levels(tier: str) -> list[str]:
+    return SKILL_LEVELS[: SKILL_LEVELS.index(tier) + 1]
 
 
 def check(agent_dir: Path, root: Path, models: set[str], known: set[str]) -> list[str]:
@@ -45,6 +52,16 @@ def check(agent_dir: Path, root: Path, models: set[str], known: set[str]) -> lis
             errs.append(f"{ref}: grants model {model!r}, not declared in models.toml")
     if tier == "user" and a.get("models"):
         errs.append(f"{ref}: user agents may not hold model grants — route through an app agent")
+
+    visible = visible_skill_levels(tier)
+    for skill in a.get("skills", []):
+        found = [lvl for lvl in SKILL_LEVELS
+                 if (root / "skills" / lvl / skill / "skill.toml").exists()]
+        if not found:
+            errs.append(f"{ref}: skill {skill!r} does not exist")
+        elif not set(found) & set(visible):
+            errs.append(f"{ref}: skill {skill!r} is at level {found[0]!r}, "
+                        f"which a {tier} agent cannot see")
 
     for peer in a.get("peers", []):
         if peer not in known:

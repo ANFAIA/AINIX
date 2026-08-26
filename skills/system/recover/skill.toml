@@ -1,0 +1,8 @@
+[skill]
+name        = "recover"
+level       = "system"
+version     = "0.1.0"
+description = "Bring a broken machine back to a usable shell."
+requires_tools  = ["journalctl"]
+requires_models = []
+protected   = true

@@ -1,0 +1,8 @@
+[skill]
+name        = "summarize"
+level       = "app"
+version     = "0.1.0"
+description = "Compress a document to its decisions, facts, and open questions."
+requires_tools  = []
+requires_models = ["gemma-3-1b"]
+protected   = false

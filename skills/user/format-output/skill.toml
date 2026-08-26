@@ -1,0 +1,8 @@
+[skill]
+name        = "format-output"
+level       = "user"
+version     = "0.1.0"
+description = "Render an agent result for a terminal: width, colour, truncation."
+requires_tools  = []
+requires_models = []
+protected   = false

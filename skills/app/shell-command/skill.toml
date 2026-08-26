@@ -1,0 +1,8 @@
+[skill]
+name        = "shell-command"
+level       = "app"
+version     = "0.1.0"
+description = "Turn stated intent into one POSIX command, with an explanation and a mutates flag."
+requires_tools  = []
+requires_models = ["gemma-3-1b"]
+protected   = false

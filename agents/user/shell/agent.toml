@@ -9,6 +9,9 @@ entrypoint = "main.mojo"
 # to an app agent, which is the only tier allowed to talk to a model runner.
 models = []
 tools  = []
+
+# Skills this agent loads. Must be at a level its tier can see.
+skills = ["explain-error", "format-output"]
 peers  = ["app/shell-expert"]
 
 [quota]

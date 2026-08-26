@@ -1,0 +1,8 @@
+[skill]
+name        = "explain-error"
+level       = "user"
+version     = "0.1.0"
+description = "Turn a command's error output into a plain explanation and a next step."
+requires_tools  = []
+requires_models = ["gemma-3-1b"]
+protected   = false

@@ -65,6 +65,32 @@ enforce it, so no single check is load-bearing:
 An ungranted model endpoint is not "denied" — its socket was never mounted, so
 it is not addressable.
 
+## Skills
+
+Skills are procedures agents load, stored at the same three levels as agents and
+ordered by privilege — `user` at the top and least privileged, `system` at the
+bottom and most privileged.
+
+**A tier may read and modify skills at its own level and every level above it,
+and cannot see the levels below.** The system tier can therefore repair or
+improve the skills of the tiers it keeps running, which is its job; a user agent
+cannot read a system skill, because that directory is never mounted into its
+namespace.
+
+| Acting tier | user | app | system |
+|---|---|---|---|
+| user | read + write | — | — |
+| app | read + write | read + write | — |
+| system | read + write | read + write | read + write |
+
+`protected = true` removes a skill from that scheme entirely — human commit
+only, whatever tier asks. `skills/system/recover` is protected, because it is
+the procedure that runs when the agents themselves are what broke.
+
+Enforcement is the same three layers as everything else: `make agent-check`
+rejects a grant the tier cannot see, the mount spec from `skillctl.py mounts`
+decides what exists in the namespace, and `agentd` audits writes.
+
 ## Protocols
 
 - **Agent → tool**: MCP over Unix sockets. One socket per granted tool.

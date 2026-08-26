@@ -72,7 +72,22 @@ work the local ones cannot do. A remote model is still a named grant: the API
 key stays with `agentd`, never enters an agent's namespace, and every remote
 call is audited. Remote entries ship `enabled = false`.
 
-## Add an agent
+## Skills
+
+A skill is a written procedure an agent loads — instructions, not code.
+
+```bash
+make skills                                  # all of them, by level
+make skills TIER=app                         # only what an app agent can see
+scripts/skillctl.py can user system/recover  # explain an access decision
+```
+
+Skill levels mirror the agent tiers and are ordered by privilege: **`user` is
+the top and least privileged, `system` the bottom and most privileged.** A tier
+may read and modify skills at its own level and every level above it, and
+cannot see the levels below — those directories are never mounted into its
+namespace. So a system agent can repair a user agent's skills; a user agent
+cannot read a system skill at all. See [skills/README.md](skills/README.md).
 
 ```bash
 make agent-new TIER=app NAME=my-agent
@@ -87,6 +102,7 @@ discovered from the tree.
 ```
 runtime/     model runner containers — Dockerfile (MAX), Dockerfile.llamacpp
 agents/      user/, app/, system/ — one directory per agent
+skills/      user/, app/, system/ — procedures agents load
 models.toml  model runners agents may be granted
 nix/         flake modules: kernel, tuning, hardware profiles, images
 scripts/     new-agent, check-agent, fetch-model, list_models

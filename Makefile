@@ -7,7 +7,7 @@ NAME        ?= ainix-runner
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot skills
 
 image:
 ifeq ($(ENGINE),max)
@@ -77,3 +77,10 @@ fetch:
 # make firstboot [ARGS=--force]
 firstboot:
 	python3 agents/system/firstboot/firstboot.py $(ARGS)
+
+# ---- skills ---------------------------------------------------------------
+
+# make skills            (everything)
+# make skills TIER=app   (only what an app agent can see)
+skills:
+	@scripts/skillctl.py list $(if $(TIER),--as $(TIER))

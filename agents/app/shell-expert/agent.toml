@@ -7,6 +7,9 @@ entrypoint = "main.mojo"
 
 models = ["gemma-3-1b"]
 tools  = []
+
+# Skills this agent loads. Must be at a level its tier can see.
+skills = ["shell-command"]
 peers  = []
 
 [quota]
