@@ -185,6 +185,14 @@ key_env  = "OPENROUTER_API_KEY"
 enabled  = false
 role     = "frontier model via OpenRouter"
 
+[remote.ox-alpha-free]
+provider = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model    = "stealth/ox-alpha"
+key_env  = "OPENROUTER_API_KEY"
+enabled  = false
+role     = "Ox Alpha Free — reasoning teacher model, $0 prompt/completion via OpenRouter"
+
 [remote.openrouter-auto]
 provider = "openrouter"
 base_url = "https://openrouter.ai/api/v1"

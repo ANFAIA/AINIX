@@ -18,7 +18,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 import sys
+import time
 import tomllib
 import urllib.error
 import urllib.request
@@ -29,6 +31,7 @@ SYSTEM = "You are the AINIX assistant."
 
 # Corpus: (glob, what this source is good for). Order matters only for logs.
 CORPUS = [
+    ("training/corpus/terminal/*.md", "terminal"),
     ("skills/*/*/SKILL.md", "procedure"),
     ("agents/*/*/agent.toml", "manifest"),
     ("models.toml", "catalog"),
@@ -40,13 +43,17 @@ CORPUS = [
     ("scripts/*.py", "commands"),
 ]
 
-# Task mix from GENERATE-DATASET.md §4. Weights are relative, not percentages.
+# Task mix from GENERATE-DATASET.md §4, extended with the AINIX_NEO_terminal
+# slices: raw Unix terminal fluency and Linux configuration management.
+# Weights are relative, not percentages.
 TASKS = {
-    "qa": 35,
-    "command": 25,
-    "error": 15,
-    "manifest": 15,
-    "refusal": 10,
+    "qa": 20,
+    "command": 15,
+    "error": 10,
+    "manifest": 10,
+    "refusal": 5,
+    "terminal": 25,
+    "config": 15,
 }
 
 INSTRUCTIONS = {
@@ -77,6 +84,23 @@ why, based on the boundaries described in the file below: crossing a tier
 boundary, using a capability that was not granted, reading a skill level the
 tier cannot see. The refusal must name the specific rule, then say what the user
 can do instead.""",
+
+    "terminal": """Write {n} examples that turn a stated terminal-management intent
+(filesystem, processes, users, permissions, packages, services, text processing,
+archives, disks) into ONE POSIX shell command, grounded in the reference below.
+The assistant turn must be JSON: {{"command":..., "explain":..., "mutates":...}}.
+Prefer safe, targeted commands; use sudo only when the intent genuinely needs it;
+set "mutates": true whenever the command changes state. About one in six examples
+must be a refusal with "command": null for destructive or dangerous requests
+(recursive force-delete of system paths, chmod 777 on system dirs, piping remote
+scripts into a shell).""",
+
+    "config": """Write {n} question/answer pairs about Linux configuration and
+administration grounded ONLY in the reference file below — config file locations,
+systemd units, ssh/sshd options, package management, environment variables, log
+locations. Phrase questions the way an operator would type them at a terminal.
+Answers must name real paths, real flags, real file syntax from the reference.
+If the reference does not support an answer, write fewer pairs.""",
 }
 
 SCHEMA_HINT = """
@@ -110,7 +134,9 @@ def load_teacher(name: str) -> dict:
     }
 
 
-def ask(teacher: dict, prompt: str, timeout: int = 180) -> str:
+def ask(teacher: dict, prompt: str, timeout: int = 180,
+        retries: int = 6) -> str:
+    import time
     body = json.dumps({
         "model": teacher["model"],
         "messages": [{"role": "user", "content": prompt}],
@@ -120,10 +146,25 @@ def ask(teacher: dict, prompt: str, timeout: int = 180) -> str:
     if teacher["key"]:
         headers["Authorization"] = f"Bearer {teacher['key']}"
 
-    req = urllib.request.Request(
-        teacher["base_url"].rstrip("/") + "/chat/completions", body, headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.load(resp)["choices"][0]["message"]["content"]
+    last = None
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            teacher["base_url"].rstrip("/") + "/chat/completions", body, headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.load(resp)["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 529):
+                raise
+            last = e
+        except (urllib.error.URLError, TimeoutError, ConnectionError,
+                ssl.SSLError) as e:
+            last = e
+        wait = min(60, 2 ** attempt * 3)
+        print(f"  . retry in {wait}s ({type(last).__name__}: {last})",
+              file=sys.stderr)
+        time.sleep(wait)
+    raise last
 
 
 def parse_pairs(raw: str) -> list[dict]:
@@ -238,6 +279,7 @@ def main() -> int:
                 fh.flush()
                 written += len(pairs)
                 print(f"  {rel:44} {task:9} +{len(pairs):3}  (total {written})")
+                time.sleep(3)  # free-tier teachers rate-limit; stay polite
 
     print(f"\n{written} records -> {out}")
     print("next: python3 training/verify.py", out)

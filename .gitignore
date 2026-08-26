@@ -1,3 +1,5 @@
 training/data/
 *.jsonl
 __pycache__/
+training/.venv*/
+models/
