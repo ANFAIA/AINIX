@@ -113,8 +113,11 @@ def load_prompts(train_csv: Path, test_csv: Path, limit: int) -> list[dict]:
 def propose(teachers: dict, row: dict, want: int) -> list[dict]:
     """Answers from up to `want` teachers that are not currently cooling."""
     out = []
+    # A saturated endpoint answers in ~150 s, not the ~30 s it manages idle.
+    # A 120 s timeout kills those calls and retries them, which adds load and
+    # guarantees the run never finishes.
     for name, raw in ask_any(teachers, f"{SYSTEM}\n\nIntent: {row['nl']}",
-                             want=want):
+                             want=want, timeout=400):
         d = extract(raw)
         if d:
             out.append({**d, "teacher": name})

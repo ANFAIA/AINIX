@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make smoke)",
+      "Bash(make bench)",
+      "Bash(make models)",
+      "Bash(make skills)",
+      "Bash(make skills:*)",
+      "Bash(make agent-check)",
+      "Bash(make agent-check:*)",
+      "Bash(make os-eval)",
+      "Bash(make run:*)",
+      "Bash(make stop)",
+      "Bash(make logs)",
+      "Bash(./test/agent-policy.sh)",
+      "Bash(scripts/skillctl.py:*)",
+      "Bash(scripts/check-agent.sh)",
+      "Bash(scripts/list_models.py:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)"
+    ]
+  }
+}

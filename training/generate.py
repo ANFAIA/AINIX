@@ -253,7 +253,7 @@ def ask(teacher: dict, prompt: str, timeout: int = 180,
     raise last
 
 
-def ask_any(teachers: dict, prompt: str, want: int = 1, timeout: int = 120):
+def ask_any(teachers: dict, prompt: str, want: int = 1, timeout: int = 400):
     """Ask up to `want` teachers, preferring whichever are not cooling.
 
     Returns [(name, text)]. A rate-limited model is skipped rather than waited
