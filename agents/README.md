@@ -24,9 +24,9 @@ That copies `agents/_template/` into `agents/app/my-agent/`. Then:
 
 1. Edit `agent.toml` — declare `models`, `tools`, `peers`, `quota`, `card`.
 2. Write `main.mojo`.
-3. `make agent-check NAME=app/my-agent` — validates the manifest against
+3. `make agent-check AGENT=app/my-agent` — validates the manifest against
    `agents/schema/agent.schema.json` and checks every grant resolves.
-4. `make agent-run NAME=app/my-agent` — runs it against the local runner.
+4. `make agent-run AGENT=app/my-agent` — runs it against the local runner.
 
 There is no central registry file to edit. `nix/agent.nix` discovers every
 directory under `agents/{user,app,system}/` that contains an `agent.toml`.

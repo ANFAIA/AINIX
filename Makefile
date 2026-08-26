@@ -6,7 +6,7 @@ WEIGHTS     ?= $(HOME)/.cache/ainix/weights
 GGUF        ?= gemma-3-1b-it-Q4_K_M.gguf
 MODEL       ?= unsloth/gemma-3-1b-it
 PORT        ?= 8000
-NAME        ?= ainix-runner
+NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
@@ -55,14 +55,14 @@ clean: stop
 
 # ---- agents ---------------------------------------------------------------
 
-# make agent-new TIER=app NAME=my-agent
+# make agent-new TIER=app AGENT=my-agent
 agent-new:
-	scripts/new-agent.sh $(TIER) $(NAME)
+	scripts/new-agent.sh $(TIER) $(AGENT)
 
 # make agent-check            (all agents)
-# make agent-check NAME=app/x (one agent)
+# make agent-check AGENT=app/x (one agent), or bare for all
 agent-check:
-	scripts/check-agent.sh $(NAME)
+	scripts/check-agent.sh $(AGENT)
 
 agents: agent-check
 
