@@ -364,3 +364,56 @@ Quarantined to `/tmp/corrupt-export.gguf`. A partial export that loads without
 complaint is worse than one that fails loudly, so the conversion step needs an
 integrity check before anything is written to the weights cache. The adapter
 itself is fine and runs under MLX; only the llama.cpp path is blocked.
+
+## Validation on a held-out benchmark — 2026-08-26
+
+The model trained on all 2507 records with no split, so nothing in
+`training/data/` can measure it. Validation uses the **test split of NL2Bash**
+(`dilkushsingh/NL2Bash`, MIT) — a benchmark from a source that was never in
+training — with any prompt overlapping the training data excluded anyway.
+
+60 held-out prompts, same sampler, adapter off and on:
+
+| | answers | contract | runs | same utility |
+|---|---|---|---|---|
+| base | 56/60 | 55/60 | 8/60 | 10/60 |
+| **tuned** | **60/60** | 54/60 | **27/60** | **39/60** |
+
+Same-utility 10 → 39 is z ≈ 5.4. Not noise.
+
+### What each column is, and is not
+
+- **answers** — produced a command instead of refusing.
+- **contract** — used the `{command, explain, mutates}` shape.
+- **runs** — executes cleanly in the sandbox, the same reward environment
+  `synthesize_docker.py` uses. **This under-counts.** `touch /testbed/test.txt`
+  is the right answer and fails because the sandbox has no `/testbed`. It also
+  over-credits: `ls | sort -r` runs fine and answers the wrong question.
+- **same utility** — same base command as the reference (`cp` vs `cp`). A weak
+  proxy for correctness, reported as one rather than dressed up as accuracy.
+
+### The format problem was a prompt problem, not a training problem
+
+An earlier note here said the dataset taught the model the wrong output shape,
+on the evidence of one ad-hoc generation that came back wrapped in `<reply>`.
+That test used a bare system prompt. With the system prompt that actually asks
+for the contract, base and tuned both produce it — 55 and 54 of 60. The shape
+mix in the data (47% contract, 25% prose, 22% bare, 5% `<reply>`) is still
+worth normalising, but it is not what the fine-tune fixed and not what was
+broken.
+
+What the fine-tune actually fixed is the answer. The base model formats
+beautifully and is wrong: 55/60 well-formed contracts, 10/60 right utility.
+
+```
+Q: list all currently open files       ref: lsof
+   base : "list all currently open files"     (echoed the question)
+   tuned: ls -la                              (still wrong, but a command)
+
+Q: create a copy of /testbed/hello.php at /testbed/hello-COPY.php
+   base : "create"
+   tuned: cp -r /testbed/hello.php /testbed/hello-COPY.php
+```
+
+Reproduce with `training/evaluate.py` (Mojo entrypoint in `evaluate.mojo`);
+full per-prompt output in `docs/eval.json`.
