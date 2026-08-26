@@ -16,8 +16,8 @@ Four things are measured, weakest evidence to strongest:
   matches      does it use the same base utility as the reference answer
 
 `runs` is not correctness: `ls | sort -r` runs fine and still answers the
-wrong question. `matches` is a weak proxy for correctness, and is reported as
-one rather than dressed up as accuracy.
+wrong question. `matches` is a weak proxy. `correct` is the real measure —
+it compares effects, and is the same signal the improvement loop trains on.
 """
 
 from __future__ import annotations
@@ -140,6 +140,8 @@ def main() -> int:
         parsed = [extract(o) for o in outs]
         cmds = [c or "false" for c, _ in parsed]
         ran = sandbox(cmds)
+        from reward import score
+        graded = [score(c, r["ref"]) for c, r in zip(cmds, rows)]
 
         n = len(rows)
         stats = {
@@ -149,18 +151,23 @@ def main() -> int:
             "runs": sum(ran),
             "matches": sum(bool(c) and base_util(c) == base_util(r["ref"])
                            for (c, _), r in zip(parsed, rows)),
+            "correct": sum(g["reward"] == 1.0 for g in graded),
+            "plausible": sum(g["reward"] == 0.6 for g in graded),
             "n": n,
         }
         report[label] = {
             **stats,
             "samples": [{"nl": r["nl"], "ref": r["ref"], "got": c,
-                         "contract": u, "ran": ok}
-                        for r, (c, u), ok in zip(rows, parsed, ran)][:15],
+                         "contract": u, "ran": ok, "verdict": g["verdict"],
+                         "why": g["why"]}
+                        for r, (c, u), ok, g in
+                        zip(rows, parsed, ran, graded)][:20],
         }
         print(f"  {label:6} answers {stats['answers']:2}/{n}  "
               f"contract {stats['contract']:2}/{n}  "
               f"runs {stats['runs']:2}/{n}  "
-              f"same-utility {stats['matches']:2}/{n}")
+              f"same-utility {stats['matches']:2}/{n}  "
+              f"CORRECT {stats['correct']:2}/{n}")
 
     Path(args.out).write_text(json.dumps(report, indent=2))
     print(f"\n-> {args.out}")

@@ -417,3 +417,45 @@ Q: create a copy of /testbed/hello.php at /testbed/hello-COPY.php
 
 Reproduce with `training/evaluate.py` (Mojo entrypoint in `evaluate.mojo`);
 full per-prompt output in `docs/eval.json`.
+
+## An outcome-based reward, and the real correctness number
+
+The reward this repo started with asks "did it exit 0". That cannot tell
+`sort -r` from `sort -rn` — both run, one answers the question. `training/reward.py`
+compares *effects* instead: candidate and reference each run in an identical,
+freshly seeded container, and what they print and what they leave on disk is
+compared.
+
+```
+1.0  equivalent   same stdout and same filesystem effect
+0.6  plausible    ran cleanly, different effect
+0.0  broken       failed to parse, failed to run, or on the refuse list
+```
+
+Graded, not binary, because rejection sampling needs to rank rather than only
+filter.
+
+### The bug that would have made it useless
+
+The first version hashed stdout as `sort | md5sum`. That scored
+`ls /var/log | sort -r` and `ls -S /var/log | head -20` **equivalent** — the
+exact pair it exists to separate. Ordering *is* the answer for half these
+questions; normalising it away rebuilds the flaw it was meant to fix. Hashing
+verbatim gives 0.6, correctly.
+
+### Re-validated with a real correctness column
+
+| | answers | contract | runs | same utility | **correct** |
+|---|---|---|---|---|---|
+| base | 56/60 | 55/60 | 8/60 | 10/60 | **5/60** |
+| tuned | 60/60 | 54/60 | 27/60 | 39/60 | **22/60** |
+
+8.3% → 36.7%. The weaker columns flattered both models: `runs` counts commands
+that execute while answering the wrong question, and `same utility` counts
+`cp -r` as `cp`. Effect-equivalence is the number to move.
+
+### Batched probing, because container startup is the cost
+
+`probe_many()` re-seeds the fixture between commands inside **one** container
+— 40 per invocation. Scoring a few hundred candidates one container at a time
+would turn minutes into an hour.
