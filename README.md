@@ -46,6 +46,19 @@ make smoke                         # asserts a real chat completion
 make bench                         # tokens/s
 ```
 
+## First boot
+
+```bash
+make firstboot
+```
+
+Asks two things, in this order: is there a network, then which model this
+machine should run. States the default, offers the catalog grouped by what the
+hardware can actually take, and downloads nothing without a choice. No network
+is a supported outcome — it records the choice and drops to a shell rather than
+trapping the user in a wizard. See
+[agents/system/firstboot/](agents/system/firstboot/README.md).
+
 ## Models
 
 ```bash

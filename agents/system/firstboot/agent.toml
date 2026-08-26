@@ -1,0 +1,28 @@
+[agent]
+name       = "firstboot"
+tier       = "system"
+domain     = "first-boot setup — network, then which model this machine runs"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+# Downloads and starts model runners. Does not *call* a model — it has no
+# reason to, and giving the setup agent inference access would be backwards.
+models = []
+tools  = []
+peers  = []
+
+[quota]
+memory = "128Mi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Runs once on first boot: checks connectivity, then offers the model catalog."
+skills      = ["system.firstboot"]
+inputs      = "tty"
+outputs     = "tty"
+
+[evolution]
+mode   = "frozen"     # required for system agents
+allow  = []
+review = "required"

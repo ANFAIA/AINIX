@@ -132,6 +132,7 @@ scaffolded, not implemented.
 | Piece | Language | Why |
 |---|---|---|
 | `scripts/check_agent.py` | Python | build-time tool, never on the hot path |
+| `agents/system/firstboot/firstboot.py` | Python | interactive console UI, runs once at boot; not on any hot path |
 | agent MCP/A2A plumbing | planned Python behind interop | JSON/HTTP libraries |
 | `agentd` broker path | planned Mojo | latency-critical, one hop per call |
 

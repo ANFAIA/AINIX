@@ -7,7 +7,7 @@ NAME        ?= ainix-runner
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot
 
 image:
 ifeq ($(ENGINE),max)
@@ -71,3 +71,9 @@ models:
 # make fetch MODEL_NAME=qwen3-1.7b
 fetch:
 	scripts/fetch-model.sh $(MODEL_NAME)
+
+# ---- first boot -----------------------------------------------------------
+
+# make firstboot [ARGS=--force]
+firstboot:
+	python3 agents/system/firstboot/firstboot.py $(ARGS)
