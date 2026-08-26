@@ -459,3 +459,34 @@ that execute while answering the wrong question, and `same utility` counts
 `probe_many()` re-seeds the fixture between commands inside **one** container
 — 40 per invocation. Scoring a few hundred candidates one container at a time
 would turn minutes into an hour.
+
+## Free-tier rate limits: back off together, then hand off
+
+The first distillation run logged **624 `HTTP Error 429`** and degraded as it
+went — chunk 1 produced 18 teacher-equivalent records, chunk 2 produced one.
+The good teacher was being starved, so almost everything fell back to
+reference-anchored.
+
+Two causes, two fixes.
+
+**Per-call retry loops do not share a limit.** Six workers each retried
+independently and walked back into the limit together. The cooldown now lives
+in a module-level table keyed by model, so one worker's 429 holds all of them
+off. Strikes accumulate across calls and decay only on success, so a model
+that is genuinely exhausted stops being asked rather than being asked more
+slowly. `Retry-After` is honoured when the server sends it, and every wait
+carries ±25% jitter.
+
+**Waiting was the first resort instead of the last.** `ask_any()` orders the
+teacher pool by how long each has left to cool and takes the first ones that
+are free. With six free models in the pool, a 429 costs a handoff rather than
+a stall.
+
+| | 429s logged | first chunk |
+|---|---|---|
+| before | 624 | 18 equivalent / 19 anchored |
+| after | 0 | 21 equivalent / 16 anchored |
+
+The progress line now names which teachers are cooling, so a pool quietly
+collapsing to one model is visible rather than inferred later from the
+`teacher` field.

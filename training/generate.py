@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
+import threading
+import time
 import os
 import ssl
 import sys
@@ -134,9 +137,69 @@ def load_teacher(name: str) -> dict:
     }
 
 
+# --------------------------------------------------------------------------
+# Rate-limit governor
+#
+# Free-tier models return 429 constantly. Two things make that survivable:
+#
+#   incremental backoff, shared across threads. A per-call retry loop is
+#   useless when six workers each retry independently — they walk straight
+#   back into the limit together. The cooldown lives here, keyed by model, so
+#   one worker's 429 holds all of them off.
+#
+#   failover. A model in cooldown is skipped, not waited on, as long as
+#   another teacher is free. Waiting is the last resort, not the first.
+
+_LIMIT_LOCK = threading.Lock()
+_COOLDOWN: dict[str, dict] = {}       # model -> {"until": ts, "strikes": int}
+
+MAX_COOLDOWN = 300.0
+
+
+def _now() -> float:
+    return time.monotonic()
+
+
+def cooling_for(model: str) -> float:
+    """Seconds until this model is worth trying again. 0 means now."""
+    with _LIMIT_LOCK:
+        st = _COOLDOWN.get(model)
+        return max(0.0, st["until"] - _now()) if st else 0.0
+
+
+def _penalise(model: str, retry_after: float | None) -> float:
+    """Escalate this model's cooldown. Strikes accumulate across calls and
+    decay only on success, so a model that is genuinely exhausted stops being
+    asked instead of being asked more slowly."""
+    with _LIMIT_LOCK:
+        st = _COOLDOWN.setdefault(model, {"until": 0.0, "strikes": 0})
+        st["strikes"] += 1
+        # Honour the server's own number when it gives one; it knows.
+        base = retry_after if retry_after else min(
+            MAX_COOLDOWN, 5.0 * (2 ** (st["strikes"] - 1)))
+        wait = min(MAX_COOLDOWN, base) * (0.75 + random.random() * 0.5)
+        st["until"] = _now() + wait
+        return wait
+
+
+def _forgive(model: str) -> None:
+    with _LIMIT_LOCK:
+        st = _COOLDOWN.get(model)
+        if st:
+            st["strikes"] = max(0, st["strikes"] - 1)
+            st["until"] = 0.0
+
+
+def _retry_after(e) -> float | None:
+    try:
+        v = e.headers.get("Retry-After")
+        return float(v) if v else None
+    except Exception:
+        return None
+
+
 def ask(teacher: dict, prompt: str, timeout: int = 180,
-        retries: int = 6) -> str:
-    import time
+        retries: int = 6, quiet: bool = False) -> str:
     body = json.dumps({
         "model": teacher["model"],
         "messages": [{"role": "user", "content": prompt}],
@@ -146,25 +209,57 @@ def ask(teacher: dict, prompt: str, timeout: int = 180,
     if teacher["key"]:
         headers["Authorization"] = f"Bearer {teacher['key']}"
 
+    model = teacher["model"]
     last = None
     for attempt in range(retries):
+        wait = cooling_for(model)
+        if wait > 0:
+            time.sleep(min(wait, 30))
         req = urllib.request.Request(
             teacher["base_url"].rstrip("/") + "/chat/completions", body, headers)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
+                _forgive(model)
                 return json.load(resp)["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as e:
-            if e.code not in (429, 500, 502, 503, 529):
+            if e.code == 429:
+                w = _penalise(model, _retry_after(e))
+                if not quiet:
+                    print(f"  . 429 {model}: cooling {w:.0f}s", file=sys.stderr)
+                last = e
+                continue
+            if e.code not in (500, 502, 503, 529):
                 raise
             last = e
         except (urllib.error.URLError, TimeoutError, ConnectionError,
                 ssl.SSLError) as e:
             last = e
-        wait = min(60, 2 ** attempt * 3)
-        print(f"  . retry in {wait}s ({type(last).__name__}: {last})",
-              file=sys.stderr)
-        time.sleep(wait)
+        backoff = min(60, 2 ** attempt * 3) * (0.75 + random.random() * 0.5)
+        if not quiet:
+            print(f"  . retry in {backoff:.0f}s ({type(last).__name__})",
+                  file=sys.stderr)
+        time.sleep(backoff)
     raise last
+
+
+def ask_any(teachers: dict, prompt: str, want: int = 1, timeout: int = 120):
+    """Ask up to `want` teachers, preferring whichever are not cooling.
+
+    Returns [(name, text)]. A rate-limited model is skipped rather than waited
+    on while another is free — with a pool of five, a 429 costs a handoff
+    instead of a stall.
+    """
+    order = sorted(teachers, key=lambda n: cooling_for(teachers[n]["model"]))
+    out = []
+    for name in order:
+        if len(out) >= want:
+            break
+        try:
+            out.append((name, ask(teachers[name], prompt, timeout=timeout,
+                                  retries=2, quiet=True)))
+        except Exception:
+            continue
+    return out
 
 
 def parse_pairs(raw: str) -> list[dict]:

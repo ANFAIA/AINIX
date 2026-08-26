@@ -39,7 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "training"))
 
-from generate import ask, load_teacher          # noqa: E402
+from generate import ask_any, load_teacher, cooling_for   # noqa: E402
 from reward import score_many                   # noqa: E402
 
 SYSTEM = """You translate a stated intent into ONE POSIX shell command.
@@ -53,7 +53,11 @@ Rules:
 - mutates is true for anything that writes, deletes, installs or sends
 - never include a credential, a key, or a token"""
 
-TEACHERS = ["remote.minimax-m3", "remote.glm-5-2", "remote.gemma-4-31b"]
+# Ordered by how good the answers are, not alphabetically: ask_any prefers
+# whichever is not rate-limited, so a wide pool turns a 429 into a handoff
+# instead of a stall.
+TEACHERS = ["remote.minimax-m3", "remote.glm-5-2", "remote.nemotron-3-ultra",
+            "remote.gemma-4-31b", "remote.inkling", "remote.nemotron-super"]
 
 _print_lock = threading.Lock()
 
@@ -102,15 +106,15 @@ def load_prompts(train_csv: Path, test_csv: Path, limit: int) -> list[dict]:
     return rows
 
 
-def propose(teacher: dict, name: str, row: dict) -> dict | None:
-    try:
-        raw = ask(teacher, f"{SYSTEM}\n\nIntent: {row['nl']}", timeout=120,
-                  retries=3)
-    except Exception as e:
-        log(f"  ! {name}: {type(e).__name__}")
-        return None
-    d = extract(raw)
-    return {**d, "teacher": name} if d else None
+def propose(teachers: dict, row: dict, want: int) -> list[dict]:
+    """Answers from up to `want` teachers that are not currently cooling."""
+    out = []
+    for name, raw in ask_any(teachers, f"{SYSTEM}\n\nIntent: {row['nl']}",
+                             want=want):
+        d = extract(raw)
+        if d:
+            out.append({**d, "teacher": name})
+    return out
 
 
 def main() -> int:
@@ -122,6 +126,8 @@ def main() -> int:
     ap.add_argument("--chunk", type=int, default=40)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--teachers", nargs="*", default=TEACHERS)
+    ap.add_argument("--per-prompt", type=int, default=2,
+                    help="how many teachers answer each intent")
     args = ap.parse_args()
 
     teachers = {n: load_teacher(n) for n in args.teachers}
@@ -137,16 +143,15 @@ def main() -> int:
         for start in range(0, len(rows), args.chunk):
             chunk = rows[start:start + args.chunk]
 
-            # Every (row, teacher) pair concurrently — the API wait dominates.
-            jobs = [(r, n, t) for r in chunk for n, t in teachers.items()]
+            # One job per intent; ask_any picks which teachers answer it.
             with ThreadPoolExecutor(args.workers) as ex:
-                results = list(ex.map(lambda j: (j[0], propose(j[2], j[1], j[0])),
-                                      jobs))
+                results = list(ex.map(
+                    lambda r: (r, propose(teachers, r, args.per_prompt)), chunk))
 
             by_row: dict[str, list[dict]] = {}
-            for row, cand in results:
-                if cand:
-                    by_row.setdefault(row["nl"], []).append(cand)
+            for row, cands in results:
+                if cands:
+                    by_row[row["nl"]] = cands
 
             pairs, index = [], []
             for row in chunk:
@@ -193,9 +198,13 @@ def main() -> int:
                 }) + "\n")
             fh.flush()
             done = start + len(chunk)
+            cooling = [n for n, t in teachers.items()
+                       if cooling_for(t["model"]) > 0]
             log(f"[{done:4}/{len(rows)}] equivalent {kept['equivalent']:4}  "
                 f"reference-anchored {kept['reference-anchored']:4}  "
-                f"dropped {kept['dropped']:3}")
+                f"dropped {kept['dropped']:3}"
+                + (f"  cooling: {','.join(n.split('.')[-1] for n in cooling)}"
+                   if cooling else ""))
 
     total = sum(kept.values())
     log(f"\n{total} prompts -> {kept['equivalent'] + kept['reference-anchored']} "
