@@ -22,12 +22,17 @@ is an expensive way to learn it.
 
 ## The student
 
-`Qwen/Qwen3-0.6B` — Apache-2.0, so a distribution can ship a derivative without
-asking anyone; full fine-tune on one 24 GB GPU, LoRA on 8 GB; and MAX supports
-`Qwen3ForCausalLM`, so the same weights have a GPU path later. In `models.toml`
-as `qwen3-0.6b`, with `qwen3-1.7b` as the step up.
+`Qwen/Qwen3.5-0.8B` — Apache-2.0, 508 MB at Q4_K_M, full fine-tune on one 24 GB
+GPU and LoRA on 8 GB, and MAX registers `Qwen3_5ForConditionalGeneration` with
+float32, which is the encoding a CPU box needs. In `models.toml` as
+`qwen3.5-0.8b`, with `qwen3.5-2b` as the step up.
 
-Licensing is the reason the current runtime default (`gemma-3-1b`) is not the
-training base: Gemma's terms restrict redistribution, and Llama's community
-license carries acceptance conditions. Both are fine to run. Neither is
-comfortable to ship a fine-tuned derivative of.
+Alternatives in the catalog, all Apache-2.0: `minicpm5-1b` (Llama arch — the
+one MAX supports most broadly) and `gemma-4-e2b` (float4 fast path on GPU, but
+no float32, so it cannot train or serve CPU-only).
+
+Licence is the first filter, since a distribution ships derivatives. That rules
+out **Gemma 3** (`gemma` licence, restricted redistribution — it is still the
+measured runtime default, just not a training base) and **Llama** (community
+licence with acceptance conditions). Gemma **4** is Apache-2.0 and carries none
+of that.

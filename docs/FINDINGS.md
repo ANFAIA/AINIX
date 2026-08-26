@@ -96,15 +96,33 @@ behind it so CPU work proceeds while MAX waits for GPU hardware:
 make image ENGINE=llamacpp && make run && make smoke
 ```
 
-## Measured — Gemma 3 1B, Q4_K_M, llama.cpp, 8 threads, Apple M5 CPU
+## Measured — llama.cpp, 8 threads, Apple M5 CPU, Q4_K_M
 
-| metric | value |
-|---|---|
-| smoke test | **PASS**, 1 s to first response |
-| prompt throughput | 93–177 tok/s |
-| generation throughput | **76.7 tok/s** |
-| weights | 769 MB |
-| image | 96 MB |
+| model | generation | prompt | weights | smoke |
+|---|---|---|---|---|
+| `gemma-3-1b` | 76.7 tok/s | 93–177 tok/s | 769 MB | PASS |
+| `qwen3.5-0.8b` | **101.6 tok/s** | 407–421 tok/s | 508 MB | PASS |
+
+Runner image is 96 MB either way.
+
+### Reasoning models return an empty answer unless thinking is disabled
+
+Qwen3.5 failed the smoke test on first run — `finish_reason: length`, empty
+`content`, and the entire token budget spent in `reasoning_content`. Raising
+`max_tokens` from 64 to 512 did not fix it; the model simply thought for longer.
+
+```json
+"chat_template_kwargs": {"enable_thinking": false}
+```
+
+turns it into a normal instruct model — `finish_reason: stop`, an answer in
+`content`, no reasoning at all. `test/smoke.sh` sends this now.
+
+Worth stating as a system-level rule rather than a test detail: **an agent that
+wants an answer must ask for one.** Any AINIX agent calling a reasoning model
+through the OpenAI API gets an empty string unless it either disables thinking
+or budgets tokens for a chain it will then throw away. `app/shell-expert`, which
+must return a JSON contract, should always disable it.
 
 The MAX runner image, for comparison, is 1.65 GB — it carries the Mojo kernel
 cache, which is the price of a compiler-based runtime and buys nothing until
@@ -117,6 +135,8 @@ there is a GPU to compile for.
 | `google/gemma-2-2b-it` | `Gemma2ForCausalLM` | no — arch absent from 26.5 entirely |
 | `unsloth/gemma-3-1b-it` | `Gemma3ForCausalLM` | no — bfloat16 only |
 | `google/gemma-4-E2B-it` | `Gemma4ForConditionalGeneration` | no — bfloat16 / float16 / float4, no float32 |
+| `Qwen/Qwen3.5-0.8B`, `-2B` | `Qwen3_5ForConditionalGeneration` | declares float32 — the most promising untested CPU candidate |
+| `openbmb/MiniCPM5-1B` | `LlamaForCausalLM` | same q4_k path as Llama 3.2, so the same arm64 codegen crash |
 | `OuteAI/Lite-Oute-1-300M` | `MistralForCausalLM` | no — bfloat16 only, despite fp32 weights on disk |
 | `Qwen/Qwen3-0.6B` | `Qwen3ForCausalLM` | declares float32, but bf16 weights cannot be cast |
 | `unsloth/Llama-3.2-1B-Instruct` | `LlamaForCausalLM` | q4_k accepted, then crashes codegen |

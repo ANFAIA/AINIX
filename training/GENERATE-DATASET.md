@@ -29,14 +29,18 @@ that cannot be grounded is discarded, not softened.
 
 | model | why |
 |---|---|
-| **`Qwen/Qwen3-0.6B`** ← recommended | Apache-2.0, so a distribution can ship and redistribute a derivative without asking anyone. Full fine-tune fits one 24 GB GPU; LoRA fits 8 GB. MAX supports `Qwen3ForCausalLM` for the GPU path later. |
-| `Qwen/Qwen3-1.7B` | Same license and arch. Use when 0.6B plateaus on the tool-calling tasks. |
-| `ibm-granite/granite-4.2-3b` | Apache-2.0, stronger tool calling out of the box, but 3B is a real training cost and a real inference cost on a minimal machine. |
+| **`Qwen/Qwen3.5-0.8B`** ← recommended | Apache-2.0, so a distribution ships and redistributes a derivative without asking anyone. 508 MB at Q4_K_M. Full fine-tune on one 24 GB GPU, LoRA on 8 GB. MAX registers `Qwen3_5ForConditionalGeneration` with **float32**, which is the encoding the CPU backend needs. |
+| `Qwen/Qwen3.5-2B` | Same licence and arch. Use when 0.8B plateaus on the tool-calling tasks. |
+| `openbmb/MiniCPM5-1B` | Apache-2.0, built for on-device. Its arch is `LlamaForCausalLM`, which MAX supports more broadly than anything else — useful if the MAX path matters more than raw quality. |
+| `google/gemma-4-E2B-it` | Apache-2.0 (Gemma 4 dropped the restrictive Gemma licence). MAX gives it a `float4_e2m1fnx2` path on GPU, but **no float32**, so it cannot train or serve on a CPU-only box. 2.9 GB. |
+| `ibm-granite/granite-4.2-3b` | Apache-2.0, stronger tool calling out of the box, but 3B is a real training and inference cost on a minimal machine. |
 
-Not recommended as the shipped default: **Gemma** (its license restricts
-redistribution, which matters for a distro) and **Llama** (community license
-with acceptance conditions). Both are fine to *run*; neither is comfortable to
-*ship a derivative of*.
+Licence is the first filter, because a distribution ships derivatives. Avoid
+**Gemma 3** (ships under the `gemma` licence, which restricts redistribution)
+and **Llama** (community licence with acceptance conditions). Both are fine to
+*run* — `gemma-3-1b` is still the measured runtime default — but neither is
+comfortable to ship a fine-tuned derivative of. Gemma **4** is not in this
+group: it is Apache-2.0.
 
 Train from the **safetensors base**, never the GGUF. GGUF is a deployment
 format; quantize after training, not before.

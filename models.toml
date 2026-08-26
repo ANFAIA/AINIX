@@ -32,6 +32,46 @@ size    = "~2GB"
 devices = "cpu"
 role    = "IBM Granite 4.2 — strong tool-calling for its size, good agent default"
 
+["qwen3.5-0.8b"]
+repo    = "unsloth/Qwen3.5-0.8B-GGUF"
+file    = "Qwen3.5-0.8B-Q4_K_M.gguf"
+size    = "508MB"
+devices = "cpu"
+base    = "Qwen/Qwen3.5-0.8B"
+arch    = "Qwen3_5ForConditionalGeneration"   # MAX: bfloat16 + float32
+license = "apache-2.0"
+role    = "recommended trainable base — newest small Qwen, Apache-2.0, MAX-supported arch"
+
+["qwen3.5-2b"]
+repo    = "unsloth/Qwen3.5-2B-GGUF"
+file    = "Qwen3.5-2B-Q4_K_M.gguf"
+size    = "1.2GB"
+devices = "cpu"
+base    = "Qwen/Qwen3.5-2B"
+arch    = "Qwen3_5ForConditionalGeneration"
+license = "apache-2.0"
+role    = "step up from 0.8B when the small base plateaus on tool calling"
+
+["minicpm5-1b"]
+repo    = "openbmb/MiniCPM5-1B-GGUF"
+file    = "MiniCPM5-1B-Q4_K_M.gguf"
+size    = "656MB"
+devices = "cpu"
+base    = "openbmb/MiniCPM5-1B"
+arch    = "LlamaForCausalLM"                  # the arch MAX supports most broadly
+license = "apache-2.0"
+role    = "MiniCPM5 1B — on-device oriented; Llama arch, so it has the widest MAX support"
+
+["gemma-4-e2b"]
+repo    = "unsloth/gemma-4-E2B-it-GGUF"
+file    = "gemma-4-E2B-it-Q4_K_M.gguf"
+size    = "2.9GB"
+devices = "cpu"
+base    = "google/gemma-4-E2B-it"
+arch    = "Gemma4ForConditionalGeneration"    # MAX: bfloat16, float16, float4 — no float32
+license = "apache-2.0"                        # unlike Gemma 3, which ships the `gemma` licence
+role    = "Gemma 4 E2B — Apache-2.0, and MAX has a float4 fast path for it on GPU"
+
 ["qwen3-0.6b"]
 repo    = "unsloth/Qwen3-0.6B-GGUF"
 file    = "Qwen3-0.6B-Q4_K_M.gguf"
@@ -39,7 +79,7 @@ size    = "~450MB"
 devices = "cpu"
 base    = "Qwen/Qwen3-0.6B"        # fine-tuning starts here, not from the GGUF
 license = "apache-2.0"
-role    = "the trainable base — small enough to fully fine-tune on one GPU, Apache-2.0"
+role    = "previous-generation small Qwen; kept for comparison against 3.5"
 
 ["qwen3-1.7b"]
 repo    = "unsloth/Qwen3-1.7B-GGUF"

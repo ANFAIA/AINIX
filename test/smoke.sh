@@ -20,11 +20,26 @@ done
 t0=$(date +%s)
 resp=$(curl -fsS "${BASE}/v1/chat/completions" \
   -H 'Content-Type: application/json' \
-  -d "{\"model\":\"${MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"In one sentence: what is a Linux kernel?\"}],\"max_tokens\":64}")
+  -d "{\"model\":\"${MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"In one sentence: what is a Linux kernel?\"}],\"max_tokens\":512,\"chat_template_kwargs\":{\"enable_thinking\":false}}")
 t1=$(date +%s)
 
-content=$(printf '%s' "$resp" | python3 -c 'import json,sys; print(json.load(sys.stdin)["choices"][0]["message"]["content"])')
-[ -n "${content// /}" ] || { echo "FAIL: empty completion" >&2; printf '%s\n' "$resp" >&2; exit 1; }
+# `enable_thinking: false` above matters: reasoning models (Qwen3.5, gpt-oss)
+# otherwise spend the whole token budget in `reasoning_content` and return an
+# empty `content`. A smoke test wants the answer, not the deliberation.
+content=$(printf '%s' "$resp" | python3 -c '
+import json, sys
+m = json.load(sys.stdin)["choices"][0]["message"]
+answer = (m.get("content") or "").strip()
+if answer:
+    print(answer)
+elif (m.get("reasoning_content") or "").strip():
+    sys.exit("REASONING_ONLY")
+')
+if [ "$content" = "" ]; then
+  echo "FAIL: no answer — the model produced only reasoning within the token budget," >&2
+  echo "      or nothing at all. Raise max_tokens, or disable thinking mode." >&2
+  exit 1
+fi
 
 echo "PASS ($((t1-t0))s)"
 printf '%s\n' "$content"

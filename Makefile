@@ -1,6 +1,9 @@
 # AINIX — POC targets.
+ENGINE      ?= llamacpp        # llamacpp | max  — see docs/FINDINGS.md
 ACCEL       ?= cpu
-IMAGE       ?= ainix/runtime:$(ACCEL)
+IMAGE       ?= ainix/runtime:$(ACCEL)-$(ENGINE)
+WEIGHTS     ?= $(HOME)/.cache/ainix/weights
+GGUF        ?= gemma-3-1b-it-Q4_K_M.gguf
 MODEL       ?= unsloth/gemma-3-1b-it
 PORT        ?= 8000
 NAME        ?= ainix-runner
