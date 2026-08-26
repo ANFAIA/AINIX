@@ -292,3 +292,75 @@ actually needs the sandboxing. Recorded here so the deviation is visible.
 `profiles/nvidia.nix` and `profiles/amd.nix` are written from documented
 interfaces and have never booted — there is no such hardware attached to this
 machine. They evaluate; that is all that can honestly be claimed.
+
+## The fine-tune ran — measured 2026-08-26
+
+1254 steps, 2 epochs over 2507 records, LoRA r=16 on all 24 layers, MLX on the
+M5 GPU. Loss 1.9 → ~0.5, 3.04 GB peak, adapter 29 MB.
+
+### It changed the model's behaviour, visibly
+
+Same prompt, same sampler, adapter on and off:
+
+```
+BASE   As an AI assistant, I do not have direct access to your local
+       filesystem or the specific contents of your /var/log directory…
+
+TUNED  <reply>
+       ls /var/log | sort -r | head -20
+       </reply>
+```
+
+The base model refuses and lectures; the tuned model answers with a command.
+That is the fine-tune working. Everything wrong with the answer after that is
+the dataset, not the training.
+
+### The dataset teaches four different output shapes
+
+```
+  1178  47.0%  json contract  {"command":…,"explain":…,"mutates":…}
+   640  25.5%  prose
+   556  22.2%  bare command
+   133   5.3%  <reply> wrapper
+```
+
+The model picked the `<reply>` wrapper — 5% of the data — over the contract
+that `app/shell-expert` actually parses. With four shapes competing, which one
+wins is close to arbitrary. **Normalising every record to the contract is worth
+more than any hyperparameter change here.** The `<reply>` records should not
+survive normalisation at all.
+
+The command it produced is also wrong: `ls /var/log | sort -r | head -20` sorts
+by *name*, not size. Nothing in the reward loop checks that an answer is
+*correct*, only that it *runs* — `sort -r` runs fine. Verifying exit status
+catches broken commands, not wrong ones.
+
+### The first attempt OOM'd, and the reason was avoidable
+
+```
+RuntimeError: [METAL] Command buffer execution failed: Insufficient Memory
+```
+
+Died at step 344 with the model runner, a Mojo agent, and three stray sandbox
+containers all holding memory. Freeing them and dropping `--max-seq` from 2048
+to 512 fixed it — the data never needed 2048 (median record ~90 tokens, p95
+195, max 533), so the rest was reserved for nothing.
+
+### GGUF export failed, so the runner cannot serve this model yet
+
+```
+RuntimeError: Unsloth: Failed to convert text model to GGUF …
+              unsloth_convert_hf_to_gguf.py --outtype bf16
+```
+
+A 529 MB `q4_k_m.gguf` was left behind by the failed run and is **corrupt** —
+loading it into llama.cpp produces token soup:
+
+```
+>] vorba-0聊城8f126 =^3^  }12+cticابعıkxel reputed11m{-{textitezerar…
+```
+
+Quarantined to `/tmp/corrupt-export.gguf`. A partial export that loads without
+complaint is worse than one that fails loudly, so the conversion step needs an
+integrity check before anything is written to the weights cache. The adapter
+itself is fine and runs under MLX; only the llama.cpp path is blocked.
