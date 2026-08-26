@@ -193,6 +193,30 @@ key_env  = "OPENROUTER_API_KEY"
 enabled  = false
 role     = "Ox Alpha Free — reasoning teacher model, $0 prompt/completion via OpenRouter"
 
+[remote.minimax-m3]
+provider = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model    = "minimax/minimax-m3:free"
+key_env  = "OPENROUTER_API_KEY"
+enabled  = false
+role     = "MiniMax M3 — 1M context, $0 via OpenRouter; lead teacher for dataset distillation"
+
+[remote.glm-5-2]
+provider = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model    = "z-ai/glm-5.2:free"
+key_env  = "OPENROUTER_API_KEY"
+enabled  = false
+role     = "GLM 5.2 — second teacher; disagreement between teachers is signal"
+
+[remote.gemma-4-31b]
+provider = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model    = "google/gemma-4-31b-it:free"
+key_env  = "OPENROUTER_API_KEY"
+enabled  = false
+role     = "Gemma 4 31B — third teacher, different family again"
+
 [remote.openrouter-auto]
 provider = "openrouter"
 base_url = "https://openrouter.ai/api/v1"

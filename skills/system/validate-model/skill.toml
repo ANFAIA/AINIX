@@ -1,0 +1,8 @@
+[skill]
+name        = "validate-model"
+level       = "system"
+version     = "0.1.0"
+description = "Measure whether a fine-tune actually improved anything, on data it has never seen."
+requires_tools  = ["docker"]
+requires_models = []
+protected   = false

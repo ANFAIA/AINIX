@@ -1,0 +1,8 @@
+[skill]
+name        = "distill-dataset"
+level       = "app"
+version     = "0.1.0"
+description = "Build training data whose every record was verified by execution before it was written."
+requires_tools  = ["docker"]
+requires_models = []
+protected   = false

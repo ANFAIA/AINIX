@@ -1,0 +1,8 @@
+[skill]
+name        = "verify-command"
+level       = "app"
+version     = "0.1.0"
+description = "Decide whether a shell command actually answers the question, by running it."
+requires_tools  = ["docker"]
+requires_models = []
+protected   = false

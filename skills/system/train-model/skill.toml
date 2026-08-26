@@ -1,0 +1,8 @@
+[skill]
+name        = "train-model"
+level       = "system"
+version     = "0.1.0"
+description = "Fine-tune the AINIX student model without repeating the failures already paid for."
+requires_tools  = ["docker"]
+requires_models = []
+protected   = false

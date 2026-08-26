@@ -1,0 +1,8 @@
+[skill]
+name        = "build-image"
+level       = "system"
+version     = "0.1.0"
+description = "Build and boot the AINIX image from a Mac, and the three ways it fails first."
+requires_tools  = ["docker", "qemu-system-aarch64"]
+requires_models = []
+protected   = false

@@ -55,6 +55,28 @@ scripts/skillctl.py can app system/manage-runner   # explain an access decision
 scripts/skillctl.py new app my-skill     # scaffold
 ```
 
+## What is here
+
+| level | skill | for |
+|---|---|---|
+| user | `explain-error` | turning a failure into a next step |
+| user | `format-output` | rendering a result for a real terminal |
+| app | `shell-command` | intent into one POSIX command |
+| app | `summarize` | a document into decisions, facts, open questions |
+| app | `verify-command` | whether a command *answers*, not just runs |
+| app | `distill-dataset` | training data verified by execution |
+| system | `manage-runner` | the shared model runners |
+| system | `train-model` | fine-tuning without repeating paid-for failures |
+| system | `validate-model` | measuring a fine-tune honestly |
+| system | `build-image` | building and booting the distribution |
+| system | `recover` | a broken machine back to a shell (protected) |
+
+The four newest carry what this repo learned the expensive way — an OOM at
+step 344, a reward that scored two different answers identical, a GGUF that
+loaded silently and emitted noise, a boot log sent to a screen nobody was
+watching. A skill is the right place for that: an agent doing the same work
+next month reads it before starting rather than rediscovering it.
+
 ## Writing one
 
 `SKILL.md` is read by a model, so write it as a procedure, not as prose about a
