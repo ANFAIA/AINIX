@@ -3,3 +3,6 @@ training/data/
 __pycache__/
 training/.venv*/
 models/
+build/
+result
+result-*

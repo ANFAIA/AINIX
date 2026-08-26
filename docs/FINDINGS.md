@@ -230,3 +230,65 @@ write a hot kernel in Mojo, keep the training loop in PyTorch/MLX.
 
 `training/train.py` therefore stays Python. Claiming otherwise would mean
 writing an autograd engine, which is not what this POC is for.
+
+## The image boots — measured 2026-08-26
+
+```
+TIME_TO_PROMPT=5s
+```
+
+Five seconds from `qemu-system-aarch64` to AINIX asking which model to run,
+on the M5 with HVF:
+
+```
+AINIX — first boot
+  Checking network… connected
+  Default model: gemma-3-1b  (769MB, smallest thing that still follows instructions)
+  This machine: 8 GB RAM
+```
+
+Kernel 6.18.2, 64 MB. Initrd 736 MB — the entire system closure as a squashfs,
+which is what makes a diskless boot possible.
+
+### Building a disk image needs KVM; a RAM boot does not
+
+`nixos-generators`' qcow format ends in a VM that installs the bootloader:
+
+```
+error: Cannot build 'nixos-disk-image.drv'.
+       Required features: {kvm}   Available features: {benchmark, big-parallel, nixos-test, uid-range}
+```
+
+Docker Desktop on macOS exposes no KVM, so that last step cannot run here. The
+netboot output — kernel + initrd + squashfs — sidesteps it completely and boots
+the *same configuration*, so the boot test is real. The qcow2 path is unchanged
+and will build on any Linux host with KVM.
+
+### Three boot failures, each a real configuration bug
+
+1. **No console output at all.** `console=ttyAMA0 console=tty0` — the *last*
+   `console=` wins for `/dev/console`, so the whole boot log went to a virtual
+   screen nobody was watching. Reversed the order.
+2. **Emergency mode on `/boot`.** `disk.nix` defined an ESP mount that a
+   RAM-booted system has no reason to have, and the failed mount took Local
+   File Systems down with it. The layout now sits behind `ainix.disk.enable`,
+   off for netboot.
+3. **First boot asked its question where nobody could answer.** `TTYPath` was
+   hardcoded to `/dev/tty1` on a serial-only machine. It is now
+   `ainix.firstboot.tty`, and the service conflicts with `serial-getty@` as
+   well as `getty@` — otherwise the login prompt races it for the terminal.
+
+### The runner is a systemd service, not a container, in v1
+
+The architecture says agents are OCI containers under crun. The single shared
+model runner is not an agent, needs no per-agent sandbox, and running it as a
+hardened systemd unit (`DynamicUser`, `ProtectSystem=strict`, `SystemCallFilter`,
+device access only on GPU profiles) keeps the image fully declarative with no
+registry pull at boot. The container path arrives with `agentd`, which is what
+actually needs the sandboxing. Recorded here so the deviation is visible.
+
+### The GPU profiles are unverified
+
+`profiles/nvidia.nix` and `profiles/amd.nix` are written from documented
+interfaces and have never booted — there is no such hardware attached to this
+machine. They evaluate; that is all that can honestly be claimed.

@@ -21,9 +21,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+# On the built image the script lives at /etc/ainix/firstboot/ and the catalog
+# at /etc/ainix/models.toml, so neither path can be derived from __file__.
 ROOT = Path(__file__).resolve().parents[3]
-CATALOG = ROOT / "models.toml"
-FETCH = ROOT / "scripts" / "fetch-model.sh"
+CATALOG = Path(os.environ.get("AINIX_CATALOG", ROOT / "models.toml"))
+FETCH = Path(os.environ.get("AINIX_FETCH", ROOT / "scripts" / "fetch-model.sh"))
 
 # Reached only to fetch weights, and only after the user asks for a download.
 PROBE_HOST = os.environ.get("AINIX_PROBE_HOST", "huggingface.co")

@@ -10,7 +10,7 @@ NAME        ?= ainix-runner
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot skills
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills
 
 image:
 ifeq ($(ENGINE),max)
@@ -87,3 +87,32 @@ firstboot:
 # make skills TIER=app   (only what an app agent can see)
 skills:
 	@scripts/skillctl.py list $(if $(TIER),--as $(TIER))
+
+# ---- bootable image -------------------------------------------------------
+#
+# Nix runs in a container because this is a Mac: no nix, no Linux kernel. The
+# named volume keeps the store between runs, so the second build is fast.
+
+NIX_RUN = docker run --rm -v "$(PWD)":/src -w /src -v ainix-nix-store:/nix \
+          -v "$(PWD)/build":/out nixos/nix \
+          nix --extra-experimental-features 'nix-command flakes'
+PROFILE ?= cpu
+ARCH    ?= aarch64
+
+# Type-check the whole configuration without building anything.
+os-eval:
+	@git add -N flake.nix nix >/dev/null 2>&1 || true
+	$(NIX_RUN) eval --raw \
+	  .#nixosConfigurations.ainix-$(PROFILE)-$(ARCH).config.system.build.toplevel.drvPath
+
+os-build:
+	@git add -N flake.nix nix >/dev/null 2>&1 || true
+	$(NIX_RUN) build .#qcow2 --out-link /out/ainix-qcow2 --print-build-logs
+
+# Boots the artefact itself, with qemu from the host.
+os-boot:
+	qemu-system-aarch64 -M virt -cpu max -smp 4 -m 8192 \
+	  -bios $$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd \
+	  -drive file=build/ainix-qcow2/nixos.qcow2,format=qcow2,if=virtio,snapshot=on \
+	  -netdev user,id=n0,hostfwd=tcp::8001-:8000 -device virtio-net-pci,netdev=n0 \
+	  -nographic
