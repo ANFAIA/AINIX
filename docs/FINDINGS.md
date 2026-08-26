@@ -159,3 +159,74 @@ scaffolded, not implemented.
 ## Not yet measured
 
 tokens/s, cold start, agent hop overhead, tuned-vs-stock kernel. Phase 5.
+
+## Mojo 1.0 and MAX on the M5 — measured 2026-08-26
+
+The toolchain was never installed before now, so the four `main.mojo` agent
+entrypoints had never been compiled. `pip install modular` into `.venv-mojo`
+provides both binaries — no pixi needed:
+
+```
+Mojo 1.0.0 (ed45d567)   MAX 26.5.0
+```
+
+### Every agent entrypoint was written in obsolete Mojo
+
+All four failed to parse. Mojo 1.0 removed a lot of what a pretrained model
+reaches for by reflex — `fn` is gone entirely, `alias` became `comptime`, and
+stdlib imports need the `std.` prefix (`from std.python import Python`, not
+`from python import Python`). All four compile now.
+
+### A Mojo callback cannot be handed to Python
+
+```
+error: value passed to 'args' cannot be converted from
+       'def handle(task: PythonObject) raises thin -> PythonObject'
+       to 'PythonObject'
+```
+
+`agent.serve(handle)` — register a handler, let the library call it — is not
+expressible across the interop boundary. The agents now run a **pull loop**
+instead: `agent.next_task()` / `agent.reply(...)`, with Mojo owning control
+flow and Python providing primitives. This is a better shape for the agent
+plane anyway (the tier's own code decides when to block), but it was forced,
+not chosen.
+
+### What Mojo's stdlib has, and what scripting still needs Python for
+
+Present: `subprocess`, `os`, `pathlib`, `io`, `time`, `logger`, `random`,
+`tempfile`, `testing`, `ffi`, `gpu`, `python`.
+**Absent: `json`, `argparse`, `http`/`net`, `regex`.**
+
+Every script in this repo is JSON plus CLI arguments plus HTTP, which is
+exactly the three the stdlib does not cover. Mojo-first therefore means Mojo
+owns the entrypoint and the control flow, with `tomllib`/`json`/`argparse`
+reached through interop — not that the Python disappears.
+
+### MAX does not run a model on this machine
+
+Native macOS arm64 wheels install and see the GPU (`accelerator_count() == 1`),
+but nothing generates:
+
+| path | result |
+|---|---|
+| `--devices gpu`, Llama-3.2-1B | `Metal Compiler failed to compile metallib` |
+| `--devices gpu`, Qwen3.5-0.8B | graph compile fails in `log_probabilities.py` |
+| `--devices cpu`, default | `compatible weights cannot be found for 'q4_k'` — CPU defaults to q4_k and wants GGUF in the same repo |
+| `--devices cpu --quantization-encoding float32` | `Cannot cast from 'float32' to 'bfloat16' ... 'bfloat16' is not supported on this device` |
+
+The Metal failure is not model-specific — it kills the arch MAX supports best.
+So llama.cpp stays the local runtime, and MAX remains the target for the GPU
+box, where the CUDA path is the one Modular actually exercises.
+
+### Fine-tuning cannot move to Mojo
+
+`max/python/max/nn` is inference layers only — attention, kv_cache, sampling,
+quant. There is no optimizer, no loss, no backward pass anywhere in the MAX
+tree. `max.experimental.torch` is a **custom-op bridge**
+(`CustomOpLibrary`, `graph_op`): it lets a Mojo kernel be called from inside a
+PyTorch graph. That is the one honest way Mojo participates in training today —
+write a hot kernel in Mojo, keep the training loop in PyTorch/MLX.
+
+`training/train.py` therefore stays Python. Claiming otherwise would mean
+writing an autograd engine, which is not what this POC is for.

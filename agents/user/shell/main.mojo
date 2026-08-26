@@ -4,19 +4,18 @@
 # executed as one — no model in the path, no latency, no surprises. Only what
 # the parser rejects becomes a question for app/shell-expert.
 
-from python import Python
+from std.python import Python
 
 
-def main():
-    ainix = Python.import_module("ainix_agent")
-    os = Python.import_module("os")
+def main() raises:
+    var ainix = Python.import_module("ainix_agent")
 
-    agent = ainix.Agent.from_manifest("agent.toml")
-    expert = agent.peer("app/shell-expert")   # present only because peers listed it
-    sh = ainix.Shell("/bin/sh")               # real shell; we do not reimplement one
+    var agent = ainix.Agent.from_manifest("agent.toml")
+    var expert = agent.peer("app/shell-expert")  # present only because peers listed it
+    var sh = ainix.Shell("/bin/sh")              # real shell; we do not reimplement one
 
     while True:
-        line = agent.readline(agent.prompt())
+        var line = agent.readline(agent.prompt())
         if not line:
             break
 
@@ -25,7 +24,7 @@ def main():
             continue
 
         # Not a command — intent. The expert holds the model grant, not us.
-        plan = expert.task("shell.ask", line)
+        var plan = expert.task("shell.ask", line)
         if plan.mutates and not agent.confirm(plan.explain()):
             continue
         sh.run(plan.command)

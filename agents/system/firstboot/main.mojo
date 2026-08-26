@@ -7,9 +7,10 @@
 # The interactive body is Python behind interop — see docs/FINDINGS.md for the
 # Mojo-first policy and what is still on the Python side.
 
-from python import Python
+from std.python import Python
 
 
-def main():
-    firstboot = Python.import_module("firstboot")
-    firstboot.run()
+def main() raises:
+    Python.add_to_path(".")
+    var firstboot = Python.import_module("firstboot")
+    _ = firstboot.run()
