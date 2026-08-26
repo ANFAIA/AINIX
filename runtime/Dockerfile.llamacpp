@@ -1,0 +1,21 @@
+# Fallback model runner: llama.cpp behind the same contract as the MAX runner.
+#
+# Why this exists: MAX 26.5's CPU backend cannot serve on aarch64 — see
+# docs/FINDINGS.md. Gemma declares only bfloat16 (unsupported on CPU), and the
+# q4_k path crashes the Mojo backend during codegen. Rather than block the whole
+# POC on that, the runner interface stays identical — OpenAI-compatible API on
+# :8000, same env vars, same volumes — and only the engine swaps.
+#
+# On GPU hardware, use runtime/Dockerfile (MAX). This image is the CPU stand-in.
+
+FROM ghcr.io/ggml-org/llama.cpp:server
+
+ENV AINIX_MODEL_FILE=/weights/model.gguf \
+    AINIX_CTX=4096 \
+    AINIX_PORT=8000 \
+    AINIX_THREADS=8
+
+COPY runtime/entry-llamacpp.sh /usr/local/bin/entry.sh
+
+EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/entry.sh"]

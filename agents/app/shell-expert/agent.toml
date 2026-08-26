@@ -1,0 +1,26 @@
+[agent]
+name       = "shell-expert"
+tier       = "app"
+domain     = "turns shell intent into concrete commands, and explains what they do"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["gemma-3-1b"]
+tools  = []
+peers  = []
+
+[quota]
+memory = "512Mi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Translates natural-language intent into a shell command plus an explanation and a mutates flag."
+skills      = ["shell.ask", "shell.explain"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

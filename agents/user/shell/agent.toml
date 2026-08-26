@@ -1,0 +1,31 @@
+[agent]
+name       = "shell"
+tier       = "user"
+domain     = "the login shell — the minimum human interface to the system"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+# A user agent gets no model grant. Anything it cannot execute itself, it hands
+# to an app agent, which is the only tier allowed to talk to a model runner.
+models = []
+tools  = []
+peers  = ["app/shell-expert"]
+
+[quota]
+memory = "128Mi"
+cpu    = "0.25"
+gpu    = "0"
+
+[card]
+description = "Interactive shell. Executes commands directly; routes intent to app agents."
+skills      = ["shell.exec", "shell.ask"]
+inputs      = "text"
+outputs     = "text"
+
+[evolution]
+# The shell's surface is grown by the app agents behind it: when an app agent
+# gains a skill, it registers the corresponding command here.
+mode   = "parent"
+parent = "app/shell-expert"
+allow  = ["card", "commands", "prompt"]
+review = "auto"

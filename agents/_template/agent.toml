@@ -1,0 +1,52 @@
+# AINIX agent manifest.
+# This file is the whole contract. Nix reads it, builds the agent from it, and
+# refuses anything the agent asks for that is not declared here.
+# Copy this directory (or run `scripts/new-agent.sh`) to add an agent.
+
+[agent]
+name        = "example"
+# user   — human surfaces (CLI/TUI/web). May call app agents. No model access.
+# app    — domain expert. Holds model and tool grants. The normal choice.
+# system — keeps other agents alive and honest. Privileged; review carefully.
+tier        = "app"
+domain      = "example domain, one sentence"
+version     = "0.1.0"
+entrypoint  = "main.mojo"
+
+# --- capabilities: nothing undeclared is reachable at runtime ---------------
+
+# Named model runners this agent may call. The name must exist in models.toml.
+models = ["gemma-3-1b"]
+
+# MCP tools. Each becomes one socket mounted into the agent; ungranted tools
+# are not denied, they are absent.
+tools = []
+
+# Other agents this agent may call, as "<tier>/<name>". Calls go through agentd.
+peers = []
+
+[quota]
+memory = "512Mi"
+cpu    = "0.5"
+gpu    = "0"
+
+# --- card: how other agents discover this one (A2A) -------------------------
+
+[card]
+description = "One line other agents read to decide whether to call you."
+skills      = ["example.do_thing"]
+inputs      = "text"
+outputs     = "text"
+
+# --- evolution: who is allowed to change this agent, and how ----------------
+
+[evolution]
+# self   — may propose changes to its own manifest and prompt
+# parent — only `parent` may change it
+# frozen — changes require a human commit
+mode   = "parent"
+parent = "app/example-owner"
+# Fields a parent (or self) may rewrite. Anything outside this list needs a
+# human. `tier` and `quota` are deliberately never in it.
+allow  = ["card", "prompt"]
+review = "required"     # required | auto

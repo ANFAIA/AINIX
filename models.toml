@@ -1,0 +1,142 @@
+# Model runners available on this AINIX system.
+#
+# Agents reference these by name. A name that is not in this file cannot be
+# granted to an agent, and `make agent-check` fails the build if one tries.
+# One runner serves many agents — agents never load weights themselves.
+#
+# `weights` is the HuggingFace GGUF repo and file. Fetch with:
+#     scripts/fetch-model.sh <name>
+#
+# Sizes are Q4_K_M unless noted. Pick a tier by what the box actually has:
+#   tier-1 (1–3B)  ~1–2 GB RAM   — runs on anything, including this laptop's CPU
+#   tier-2 (8–12B) ~5–8 GB RAM   — small GPU, or a patient CPU
+#   tier-3 (20–30B) ~12–20 GB    — real GPU territory
+
+# ===========================================================================
+# tier 1 — small: 1B to 3B
+# ===========================================================================
+
+[gemma-3-1b]
+repo    = "unsloth/gemma-3-1b-it-GGUF"
+file    = "gemma-3-1b-it-Q4_K_M.gguf"
+size    = "769MB"
+devices = "cpu"
+role    = "system default — smallest thing that still follows instructions"
+default = true
+
+["granite-4.2-3b"]
+repo    = "ibm-granite/granite-4.2-3b-GGUF"
+file    = "granite-4.2-3b-Q4_K_M.gguf"
+size    = "~2GB"
+devices = "cpu"
+role    = "IBM Granite 4.2 — strong tool-calling for its size, good agent default"
+
+["qwen3-1.7b"]
+repo    = "unsloth/Qwen3-1.7B-GGUF"
+file    = "Qwen3-1.7B-Q4_K_M.gguf"
+size    = "~1.1GB"
+devices = "cpu"
+role    = "Qwen3 — reasoning-capable at tiny size, hybrid thinking mode"
+
+["llama-3.2-3b"]
+repo    = "unsloth/Llama-3.2-3B-Instruct-GGUF"
+file    = "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+size    = "~2GB"
+devices = "cpu"
+role    = "Llama 3.2 — the arch MAX supports best, useful for MAX/llama.cpp A-B"
+
+# ===========================================================================
+# tier 2 — mid: 8B to 12B
+# ===========================================================================
+
+[qwen3-8b]
+repo    = "unsloth/Qwen3-8B-GGUF"
+file    = "Qwen3-8B-Q4_K_M.gguf"
+size    = "~5GB"
+devices = "gpu"
+role    = "general workhorse"
+
+[nemotron-nano-9b]
+repo    = "bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF"
+file    = "nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf"
+size    = "~5.5GB"
+devices = "gpu"
+role    = "NVIDIA Nemotron Nano — hybrid Mamba/Transformer, tuned for NVIDIA hardware"
+
+[granite-4-small]
+repo    = "ibm-granite/granite-4.0-h-small-GGUF"
+file    = "granite-4.0-h-small-Q4_K_M.gguf"
+size    = "~7GB"
+devices = "gpu"
+role    = "IBM Granite 4.0 H Small — long context, enterprise tool use"
+
+[gemma-3-12b]
+repo    = "unsloth/gemma-3-12b-it-GGUF"
+file    = "gemma-3-12b-it-Q4_K_M.gguf"
+size    = "~7GB"
+devices = "gpu"
+role    = "Gemma 3 12B — multimodal capable"
+
+# ===========================================================================
+# tier 3 — large: 20B to 30B
+# ===========================================================================
+
+[qwen3-30b-a3b]
+repo    = "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF"
+file    = "Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf"
+size    = "~18GB"
+devices = "gpu"
+role    = "MoE, 3B active of 30B — 30B quality at roughly 3B compute. Best value here."
+
+[gpt-oss-20b]
+repo    = "unsloth/gpt-oss-20b-GGUF"
+file    = "gpt-oss-20b-Q4_K_M.gguf"
+size    = "~12GB"
+devices = "gpu"
+role    = "OpenAI gpt-oss 20B — MoE, strong reasoning, Apache-2.0"
+
+[gemma-3-27b]
+repo    = "unsloth/gemma-3-27b-it-GGUF"
+file    = "gemma-3-27b-it-Q4_K_M.gguf"
+size    = "~16GB"
+devices = "gpu"
+role    = "Gemma 3 27B — dense, the quality ceiling for a single consumer GPU"
+
+# ===========================================================================
+# remote — third-party APIs
+# ===========================================================================
+#
+# A remote model is still a named grant: an agent that was not granted
+# `gpt-5` cannot reach it, and the API key never enters the agent's namespace.
+# The key lives with agentd, which proxies the call and records it in the audit
+# log — so a compromised agent leaks requests, not credentials.
+#
+# Set the key in the environment agentd runs in, never in this file:
+#     OPENAI_API_KEY, OPENROUTER_API_KEY
+#
+# Remote models are off by default. `enabled = false` means an agent may
+# declare the grant but every call fails closed until a human flips it.
+
+[remote.gpt-5]
+provider = "openai"
+base_url = "https://api.openai.com/v1"
+model    = "gpt-5"
+key_env  = "OPENAI_API_KEY"
+enabled  = false
+role     = "frontier model, for work the local tiers cannot do"
+
+[remote.claude-opus-4-5]
+provider = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model    = "anthropic/claude-opus-4.5"
+key_env  = "OPENROUTER_API_KEY"
+enabled  = false
+role     = "frontier model via OpenRouter"
+
+[remote.openrouter-auto]
+provider = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model    = "openrouter/auto"
+key_env  = "OPENROUTER_API_KEY"
+enabled  = false
+role     = "OpenRouter picks the model — cheap way to reach anything without pinning"
