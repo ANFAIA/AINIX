@@ -21,7 +21,8 @@ repo    = "unsloth/gemma-3-1b-it-GGUF"
 file    = "gemma-3-1b-it-Q4_K_M.gguf"
 size    = "769MB"
 devices = "cpu"
-role    = "system default — smallest thing that still follows instructions"
+license = "gemma"                  # redistribution is restricted — see docs/FINDINGS.md
+role    = "smallest thing that still follows instructions; measured at 76.7 tok/s"
 default = true
 
 ["granite-4.2-3b"]
@@ -31,12 +32,23 @@ size    = "~2GB"
 devices = "cpu"
 role    = "IBM Granite 4.2 — strong tool-calling for its size, good agent default"
 
+["qwen3-0.6b"]
+repo    = "unsloth/Qwen3-0.6B-GGUF"
+file    = "Qwen3-0.6B-Q4_K_M.gguf"
+size    = "~450MB"
+devices = "cpu"
+base    = "Qwen/Qwen3-0.6B"        # fine-tuning starts here, not from the GGUF
+license = "apache-2.0"
+role    = "the trainable base — small enough to fully fine-tune on one GPU, Apache-2.0"
+
 ["qwen3-1.7b"]
 repo    = "unsloth/Qwen3-1.7B-GGUF"
 file    = "Qwen3-1.7B-Q4_K_M.gguf"
 size    = "~1.1GB"
 devices = "cpu"
-role    = "Qwen3 — reasoning-capable at tiny size, hybrid thinking mode"
+base    = "Qwen/Qwen3-1.7B"
+license = "apache-2.0"
+role    = "Qwen3 1.7B — step up from the trainable base when 0.6B is not enough"
 
 ["llama-3.2-3b"]
 repo    = "unsloth/Llama-3.2-3B-Instruct-GGUF"
