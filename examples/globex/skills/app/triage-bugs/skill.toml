@@ -1,0 +1,8 @@
+[skill]
+name        = "triage-bugs"
+level       = "app"
+version     = "0.1.0"
+description = "prioritise and assign the bug backlog"
+requires_tools  = []
+requires_models = []
+protected   = false

@@ -1,0 +1,37 @@
+# Generated. Clearance is granted to a group; an agent may hold
+# at most its group's level.
+
+[levels]
+order = ["public", "internal", "confidential", "restricted"]
+
+[groups.revenue]
+description = "Outbound sales, lead qualification, and CRM hygiene. Must not see unreleased roadmap or contract values."
+clearance   = "confidential"
+
+[groups.support]
+description = "Customer-facing ticket triage and public help articles. Reads untrusted input, so its agents hold the lowest clearance that still works."
+clearance   = "public"
+
+[groups.engineering]
+description = "Bug triage, release notes drafting, and dependency security review. Sees unreleased work."
+clearance   = "restricted"
+
+[groups.finance]
+description = "Invoicing, budget tracking, and renewal forecasting. Custody of contract values."
+clearance   = "restricted"
+
+[groups.people]
+description = "Hiring pipeline and onboarding. Custody of candidate and employee personal data."
+clearance   = "restricted"
+
+[groups.knowledge]
+description = "Custody of every document and derived memory. Brokers reads against requester clearance."
+clearance   = "restricted"
+
+[groups.console]
+description = "The human-facing surface. Holds no model grants and no clearance above public."
+clearance   = "public"
+
+[groups.kernel]
+description = "Keeps the other agents alive. Evolution is frozen."
+clearance   = "internal"

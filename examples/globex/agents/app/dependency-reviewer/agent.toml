@@ -1,0 +1,31 @@
+[agent]
+name       = "dependency-reviewer"
+tier       = "app"
+group      = "engineering"
+domain     = "review dependency update advisories for security impact"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["remote.claude-opus-4-5"]
+tools  = ["advisory-feed.read", "git.read"]
+skills = ["review-dependency"]
+peers  = ["app/knowledge-broker", "app/bug-triager"]
+
+[documents]
+clearance = "restricted"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "reviews proposed dependency updates against security advisories and recommends accept or reject; never reads finance or people data."
+skills      = ["ns.review-dependency"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

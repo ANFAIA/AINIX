@@ -6,7 +6,7 @@ domain     = "owns the words on acme.com — structure, copy, and keeping it tru
 version    = "0.1.0"
 entrypoint = "main.mojo"
 
-models = ["qwen3.5-2b"]
+models = ["remote.minimax-m3", "qwen3.5-2b"]
 tools  = ["cms-read", "cms-write"]
 skills = ["write-web-copy"]
 peers  = ["app/social-media", "app/librarian"]

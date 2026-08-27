@@ -1,0 +1,31 @@
+[agent]
+name       = "sequence-drafter"
+tier       = "app"
+group      = "revenue"
+domain     = "draft outbound email sequences for sales reps to approve"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["product-capabilities.read", "drafts.write"]
+skills = ["draft-sequence"]
+peers  = ["app/knowledge-broker", "app/lead-qualifier"]
+
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "drafts outbound sequences grounded in shipped product only and hands drafts to a human for approval before any send."
+skills      = ["ns.draft-sequence"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

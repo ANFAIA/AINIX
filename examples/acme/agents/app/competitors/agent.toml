@@ -6,7 +6,7 @@ domain     = "tracks what competitors ship, price, and claim"
 version    = "0.1.0"
 entrypoint = "main.mojo"
 
-models = ["qwen3-8b"]
+models = ["remote.minimax-m3", "qwen3-8b"]
 tools  = ["web-search", "web-fetch"]
 skills = ["analyse-competitor"]
 peers  = ["app/article-scout", "app/librarian", "app/market"]

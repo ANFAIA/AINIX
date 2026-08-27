@@ -1,0 +1,8 @@
+[skill]
+name        = "issue-invoice"
+level       = "app"
+version     = "0.1.0"
+description = "generate an invoice for an approved order"
+requires_tools  = []
+requires_models = []
+protected   = false

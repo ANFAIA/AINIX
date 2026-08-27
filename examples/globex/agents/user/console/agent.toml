@@ -1,0 +1,31 @@
+[agent]
+name       = "console"
+tier       = "user"
+group      = "console"
+domain     = "human-facing console that any person uses to talk to globex"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = []
+tools  = ["ui.chat"]
+skills = ["route-request"]
+peers  = ["app/lead-qualifier", "app/ticket-responder", "app/bug-intake", "app/invoice-clerk", "app/renewal-forecaster", "app/recruiter", "app/knowledge-broker"]
+
+[documents]
+clearance = "public"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "single entry point where a globex employee or customer types requests and gets routed to the right app agent."
+skills      = ["ns.route"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

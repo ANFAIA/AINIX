@@ -1,0 +1,31 @@
+[agent]
+name       = "bug-intake"
+tier       = "app"
+group      = "support"
+domain     = "file confirmed bugs into engineering's tracker without reading engineering design docs"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["bug-tracker.write"]
+skills = ["file-bug"]
+peers  = ["app/ticket-responder", "app/knowledge-broker"]
+
+[documents]
+clearance = "public"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "files a confirmed customer bug into the engineering bug tracker with reproduction steps; never reads engineering design docs."
+skills      = ["ns.file-bug"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

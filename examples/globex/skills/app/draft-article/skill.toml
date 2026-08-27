@@ -1,0 +1,8 @@
+[skill]
+name        = "draft-article"
+level       = "app"
+version     = "0.1.0"
+description = "draft a public help article for human review"
+requires_tools  = []
+requires_models = []
+protected   = false

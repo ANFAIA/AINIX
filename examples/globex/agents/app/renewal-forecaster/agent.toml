@@ -1,0 +1,31 @@
+[agent]
+name       = "renewal-forecaster"
+tier       = "app"
+group      = "finance"
+domain     = "forecast renewal revenue from contract values and churn signals"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["billing.read", "forecast.write"]
+skills = ["forecast-renewals"]
+peers  = ["app/knowledge-broker", "app/invoice-clerk"]
+
+[documents]
+clearance = "confidential"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "produces a renewal forecast from contract values; the forecast is returned to a human, never published to customers."
+skills      = ["ns.forecast-renewals"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

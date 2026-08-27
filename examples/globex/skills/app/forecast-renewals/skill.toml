@@ -1,0 +1,8 @@
+[skill]
+name        = "forecast-renewals"
+level       = "app"
+version     = "0.1.0"
+description = "produce a renewal revenue forecast"
+requires_tools  = []
+requires_models = []
+protected   = false

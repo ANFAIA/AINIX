@@ -1,0 +1,8 @@
+[skill]
+name        = "review-dependency"
+level       = "app"
+version     = "0.1.0"
+description = "assess a dependency update for security and stability"
+requires_tools  = []
+requires_models = []
+protected   = false

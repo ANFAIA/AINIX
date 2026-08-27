@@ -1,0 +1,8 @@
+[skill]
+name        = "fetch-doc"
+level       = "app"
+version     = "0.1.0"
+description = "return a document if and only if the requester's clearance covers it"
+requires_tools  = []
+requires_models = []
+protected   = false

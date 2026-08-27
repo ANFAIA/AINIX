@@ -1,0 +1,31 @@
+[agent]
+name       = "release-noter"
+tier       = "app"
+group      = "engineering"
+domain     = "draft release notes from merged engineering work"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["bug-tracker.read", "git.read", "drafts.write"]
+skills = ["draft-release-notes"]
+peers  = ["app/knowledge-broker", "app/dependency-reviewer"]
+
+[documents]
+clearance = "restricted"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "drafts release notes from the bug tracker and merged code; returns a draft to a human who approves publication."
+skills      = ["ns.draft-release-notes"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

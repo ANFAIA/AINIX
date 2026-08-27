@@ -1,0 +1,8 @@
+[skill]
+name        = "draft-release-notes"
+level       = "app"
+version     = "0.1.0"
+description = "draft release notes for a version"
+requires_tools  = []
+requires_models = []
+protected   = false

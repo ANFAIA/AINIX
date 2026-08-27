@@ -1,0 +1,8 @@
+[skill]
+name        = "draft-sequence"
+level       = "app"
+version     = "0.1.0"
+description = "produce an outbound email sequence as a draft, never sent"
+requires_tools  = []
+requires_models = []
+protected   = false

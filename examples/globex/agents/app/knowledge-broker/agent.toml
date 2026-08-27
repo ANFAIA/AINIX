@@ -1,0 +1,31 @@
+[agent]
+name       = "knowledge-broker"
+tier       = "app"
+group      = "knowledge"
+domain     = "sole custodian of every document and memory artifact; brokers every read against the requester's clearance"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["gemma-3-1b"]
+tools  = ["docs.read", "docs.write", "memory.read", "memory.write"]
+skills = ["fetch-doc"]
+peers  = ["app/lead-qualifier", "app/sequence-drafter", "app/ticket-responder", "app/bug-intake", "app/help-article-drafter", "app/release-noter", "app/bug-triager", "app/dependency-reviewer", "app/invoice-clerk", "app/renewal-forecaster", "app/recruiter"]
+
+[documents]
+clearance = "restricted"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "the only agent that opens documents; checks the requester's clearance and returns only what they are allowed to see."
+skills      = ["ns.fetch-doc", "ns.search-mem"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

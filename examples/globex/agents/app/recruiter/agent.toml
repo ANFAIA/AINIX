@@ -1,0 +1,31 @@
+[agent]
+name       = "recruiter"
+tier       = "app"
+group      = "people"
+domain     = "run the hiring pipeline and onboarding workflows"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["ats.read", "ats.write"]
+skills = ["screen-candidate"]
+peers  = ["app/knowledge-broker"]
+
+[documents]
+clearance = "confidential"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "screens candidates, schedules interviews, and runs onboarding; holds candidate and employee personal data; never reads finance data."
+skills      = ["ns.screen-candidate", "ns.run-onboarding"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

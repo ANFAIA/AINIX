@@ -1,0 +1,8 @@
+[skill]
+name        = "route-request"
+level       = "user"
+version     = "0.1.0"
+description = "accept a human request and forward it to the appropriate app agent"
+requires_tools  = []
+requires_models = []
+protected   = false

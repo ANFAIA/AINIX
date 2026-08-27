@@ -1,0 +1,31 @@
+[agent]
+name       = "invoice-clerk"
+tier       = "app"
+group      = "finance"
+domain     = "issue invoices and track spend against the approved budget"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3.5-2b"]
+tools  = ["billing.read", "billing.write", "budget.read"]
+skills = ["issue-invoice"]
+peers  = ["app/knowledge-broker", "app/renewal-forecaster"]
+
+[documents]
+clearance = "confidential"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "issues invoices and reports budget variance; holds contract values; never reads people data."
+skills      = ["ns.issue-invoice", "ns.report-budget"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

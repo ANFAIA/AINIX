@@ -1,0 +1,8 @@
+[skill]
+name        = "answer-ticket"
+level       = "app"
+version     = "0.1.0"
+description = "reply to a customer ticket grounded in public docs only"
+requires_tools  = []
+requires_models = []
+protected   = false

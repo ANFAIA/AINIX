@@ -1,0 +1,31 @@
+[agent]
+name       = "ticket-responder"
+tier       = "app"
+group      = "support"
+domain     = "answer customer tickets and triage bugs from untrusted customer input"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["ticket-system.read", "ticket-system.reply", "attachments.read"]
+skills = ["answer-ticket"]
+peers  = ["app/knowledge-broker", "app/bug-intake", "app/help-article-drafter"]
+
+[documents]
+clearance = "public"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "answers customer tickets using only public product docs; routes confirmed bugs to bug-intake; drafts help articles for a human to approve."
+skills      = ["ns.answer-ticket", "ns.triage-bug"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

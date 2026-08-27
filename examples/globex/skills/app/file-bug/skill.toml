@@ -1,0 +1,8 @@
+[skill]
+name        = "file-bug"
+level       = "app"
+version     = "0.1.0"
+description = "open a bug in the engineering tracker"
+requires_tools  = []
+requires_models = []
+protected   = false

@@ -1,0 +1,31 @@
+[agent]
+name       = "help-article-drafter"
+tier       = "app"
+group      = "support"
+domain     = "draft public help centre articles for a human to approve and publish"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3.5-2b"]
+tools  = ["product-capabilities.read", "drafts.write"]
+skills = ["draft-article"]
+peers  = ["app/knowledge-broker", "app/ticket-responder"]
+
+[documents]
+clearance = "public"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "drafts help-centre articles grounded in shipped product only and returns them to a human; never publishes."
+skills      = ["ns.draft-article"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

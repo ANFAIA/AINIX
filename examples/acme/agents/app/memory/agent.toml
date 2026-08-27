@@ -6,7 +6,7 @@ domain     = "remembers what ACME learned, so the same question is not researche
 version    = "0.1.0"
 entrypoint = "main.mojo"
 
-models = ["qwen3.5-2b"]
+models = ["remote.minimax-m3", "qwen3.5-2b"]
 tools  = ["doc-store"]
 skills = ["classify-document"]
 peers  = ["app/librarian"]

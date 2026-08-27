@@ -1,0 +1,31 @@
+[agent]
+name       = "lead-qualifier"
+tier       = "app"
+group      = "revenue"
+domain     = "qualify inbound leads against product capabilities and update the crm"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["crm.read", "crm.write", "product-capabilities.read"]
+skills = ["qualify-lead"]
+peers  = ["app/knowledge-broker", "app/sequence-drafter", "app/invoice-clerk"]
+
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "asks qualifying questions, scores leads, and writes the result to the crm; never reads roadmap or contract values."
+skills      = ["ns.qualify-lead"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

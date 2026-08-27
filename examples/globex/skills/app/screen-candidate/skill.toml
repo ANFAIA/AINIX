@@ -1,0 +1,8 @@
+[skill]
+name        = "screen-candidate"
+level       = "app"
+version     = "0.1.0"
+description = "evaluate a candidate against a role"
+requires_tools  = []
+requires_models = []
+protected   = false

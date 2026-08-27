@@ -1,0 +1,31 @@
+[agent]
+name       = "bug-triager"
+tier       = "app"
+group      = "engineering"
+domain     = "triage incoming bugs by severity and assign them to owners"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["bug-tracker.read", "bug-tracker.write"]
+skills = ["triage-bugs"]
+peers  = ["app/knowledge-broker", "app/dependency-reviewer", "app/release-noter"]
+
+[documents]
+clearance = "restricted"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "prioritises and assigns incoming bugs in the engineering tracker; sees unreleased work but does not write code."
+skills      = ["ns.triage-bugs"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

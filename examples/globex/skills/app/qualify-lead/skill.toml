@@ -1,0 +1,8 @@
+[skill]
+name        = "qualify-lead"
+level       = "app"
+version     = "0.1.0"
+description = "score a lead and record the result"
+requires_tools  = []
+requires_models = []
+protected   = false

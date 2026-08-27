@@ -6,7 +6,7 @@ domain     = "sizes the market and watches where it is moving"
 version    = "0.1.0"
 entrypoint = "main.mojo"
 
-models = ["qwen3-8b"]
+models = ["remote.minimax-m3", "qwen3-8b"]
 tools  = ["web-search"]
 skills = ["analyse-competitor"]
 peers  = ["app/article-scout", "app/competitors"]

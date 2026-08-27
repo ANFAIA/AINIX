@@ -1,0 +1,31 @@
+[agent]
+name       = "supervisor"
+tier       = "system"
+group      = "kernel"
+domain     = "starts, monitors, and restarts the other agents; evolution is frozen"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = []
+tools  = ["proc.spawn", "proc.signal", "proc.log"]
+skills = ["supervise-runtime"]
+peers  = []
+
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "keeps the agent runtime alive; makes no domain decisions and holds no business data."
+skills      = []
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "frozen"
+allow  = []
+review = "required"

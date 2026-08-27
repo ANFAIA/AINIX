@@ -1,0 +1,8 @@
+[skill]
+name        = "supervise-runtime"
+level       = "app"
+version     = "0.1.0"
+description = "ensure every required agent is running and healthy"
+requires_tools  = []
+requires_models = []
+protected   = false
