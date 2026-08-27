@@ -1,0 +1,8 @@
+[skill]
+name        = "classify-document"
+level       = "app"
+version     = "0.1.0"
+description = "Assign a document the lowest classification that is still correct."
+requires_tools  = []
+requires_models = []
+protected   = false

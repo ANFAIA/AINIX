@@ -153,8 +153,14 @@ def load_teacher(name: str) -> dict:
 
 _LIMIT_LOCK = threading.Lock()
 _COOLDOWN: dict[str, dict] = {}       # model -> {"until": ts, "strikes": int}
+_LAST_CALL: dict[str, float] = {}     # model -> when it was last asked
 
 MAX_COOLDOWN = 300.0
+
+# Minimum gap between two calls to the SAME model. Free tiers rate-limit per
+# model, so pacing each one and spreading the work across several is what turns
+# a burst that trips every limit into a steady rate that trips none.
+MIN_INTERVAL = 1.0
 
 
 def _now() -> float:
@@ -181,6 +187,24 @@ def _penalise(model: str, retry_after: float | None) -> float:
         wait = min(MAX_COOLDOWN, base) * (0.75 + random.random() * 0.5)
         st["until"] = _now() + wait
         return wait
+
+
+def _pace(model: str) -> None:
+    """Hold this model to one call per MIN_INTERVAL, counting from the last
+    call any thread made to it."""
+    while True:
+        with _LIMIT_LOCK:
+            gap = _now() - _LAST_CALL.get(model, 0.0)
+            if gap >= MIN_INTERVAL:
+                _LAST_CALL[model] = _now()
+                return
+            wait = MIN_INTERVAL - gap
+        time.sleep(wait)
+
+
+def _idle_since(model: str) -> float:
+    with _LIMIT_LOCK:
+        return _now() - _LAST_CALL.get(model, 0.0)
 
 
 def _forgive(model: str) -> None:
@@ -223,6 +247,7 @@ def ask(teacher: dict, prompt: str, timeout: int = 180,
         wait = cooling_for(model)
         if wait > 0:
             time.sleep(min(wait, 30))
+        _pace(model)
         req = urllib.request.Request(
             teacher["base_url"].rstrip("/") + "/chat/completions", body, headers)
         try:
@@ -260,7 +285,11 @@ def ask_any(teachers: dict, prompt: str, want: int = 1, timeout: int = 400):
     on while another is free — with a pool of five, a 429 costs a handoff
     instead of a stall.
     """
-    order = sorted(teachers, key=lambda n: cooling_for(teachers[n]["model"]))
+    # Free first, then whichever has been resting longest. Sorting on cooldown
+    # alone sends every worker to the same model — the pool serialises onto one
+    # teacher and the other five sit idle while that one is rate-limited.
+    order = sorted(teachers, key=lambda n: (cooling_for(teachers[n]["model"]),
+                                            -_idle_since(teachers[n]["model"])))
     out = []
     for name in order:
         if len(out) >= want:

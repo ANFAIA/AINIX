@@ -1,0 +1,27 @@
+# Agent groups at ACME, and the highest classification each may reach.
+#
+# Clearance is granted to a GROUP, and an agent may hold at most its group's
+# level. That ordering matters: a group is an organisational fact that changes
+# rarely and is reviewed by a human, while agents are added weekly. If clearance
+# were per-agent only, every new agent would be a fresh chance to quietly grant
+# too much.
+
+[levels]
+# Lowest to highest. A clearance grants everything at or below it.
+order = ["public", "internal", "confidential", "restricted"]
+
+[groups.marketing]
+description = "Outward-facing voice — social, content, and what gets said publicly"
+clearance   = "internal"
+
+[groups.web]
+description = "The website itself: content, publishing, structure"
+clearance   = "internal"
+
+[groups.strategy]
+description = "Competitors, product direction, market analysis"
+clearance   = "confidential"
+
+[groups.documents]
+description = "Custody of ACME's documents and the memory built from them"
+clearance   = "restricted"

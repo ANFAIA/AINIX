@@ -1,0 +1,31 @@
+[agent]
+name       = "competitors"
+tier       = "app"
+group      = "strategy"
+domain     = "tracks what competitors ship, price, and claim"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["web-search", "web-fetch"]
+skills = ["analyse-competitor"]
+peers  = ["app/article-scout", "app/librarian", "app/market"]
+
+[documents]
+clearance = "confidential"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Tracks competitor releases, pricing, and positioning, and reports what changed rather than restating what is already known."
+skills      = ["strategy.competitors"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

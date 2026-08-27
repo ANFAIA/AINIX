@@ -1,0 +1,8 @@
+[skill]
+name        = "explain-result"
+level       = "user"
+version     = "0.1.0"
+description = "Render an agent's answer for a person, including what it could not do."
+requires_tools  = []
+requires_models = []
+protected   = false

@@ -1,0 +1,8 @@
+[skill]
+name        = "write-social-post"
+level       = "app"
+version     = "0.1.0"
+description = "Draft one social post from a brief, for a named platform."
+requires_tools  = []
+requires_models = []
+protected   = false

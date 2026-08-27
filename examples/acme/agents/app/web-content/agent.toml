@@ -1,0 +1,31 @@
+[agent]
+name       = "web-content"
+tier       = "app"
+group      = "web"
+domain     = "owns the words on acme.com — structure, copy, and keeping it true"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3.5-2b"]
+tools  = ["cms-read", "cms-write"]
+skills = ["write-web-copy"]
+peers  = ["app/social-media", "app/librarian"]
+
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Manages website content: page copy, structure, and keeping published claims consistent with what the product actually does."
+skills      = ["web.edit", "web.audit"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

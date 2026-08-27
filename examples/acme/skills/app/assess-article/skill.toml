@@ -1,0 +1,8 @@
+[skill]
+name        = "assess-article"
+level       = "app"
+version     = "0.1.0"
+description = "Score an external article for relevance, freshness, and source quality."
+requires_tools  = []
+requires_models = []
+protected   = false

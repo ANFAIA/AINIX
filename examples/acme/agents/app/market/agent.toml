@@ -1,0 +1,31 @@
+[agent]
+name       = "market"
+tier       = "app"
+group      = "strategy"
+domain     = "sizes the market and watches where it is moving"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b"]
+tools  = ["web-search"]
+skills = ["analyse-competitor"]
+peers  = ["app/article-scout", "app/competitors"]
+
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Sizes segments, tracks demand signals, and separates a trend from a quarter of noise."
+skills      = ["strategy.market"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

@@ -1,0 +1,31 @@
+[agent]
+name       = "web-posts"
+tier       = "app"
+group      = "web"
+domain     = "publishes long-form posts to the site, and keeps them in step with social"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3.5-2b"]
+tools  = ["cms-write"]
+skills = ["write-web-copy"]
+peers  = ["app/web-content", "app/social-media"]
+
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Publishes blog and announcement posts to acme.com, coordinating with social so the two never contradict each other."
+skills      = ["web.publish", "web.schedule"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

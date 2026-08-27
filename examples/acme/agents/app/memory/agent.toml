@@ -1,0 +1,31 @@
+[agent]
+name       = "memory"
+tier       = "app"
+group      = "documents"
+domain     = "remembers what ACME learned, so the same question is not researched twice"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3.5-2b"]
+tools  = ["doc-store"]
+skills = ["classify-document"]
+peers  = ["app/librarian"]
+
+[documents]
+clearance = "confidential"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Long-term memory over past work: decisions, their reasons, and what was tried and abandoned."
+skills      = ["memory.recall", "memory.write"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

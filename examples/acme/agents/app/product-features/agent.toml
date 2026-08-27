@@ -1,0 +1,31 @@
+[agent]
+name       = "product-features"
+tier       = "app"
+group      = "strategy"
+domain     = "reasons about what ACME should build next, and what it should not"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3-8b", "remote.claude-opus-4-5"]
+tools  = []
+skills = ["analyse-competitor"]
+peers  = ["app/competitors", "app/librarian"]
+
+[documents]
+clearance = "confidential"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Analyses the product roadmap against evidence: what customers ask for, what competitors ship, what the team can actually deliver."
+skills      = ["strategy.features"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

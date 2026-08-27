@@ -1,0 +1,35 @@
+[agent]
+name       = "console"
+tier       = "user"
+group      = "marketing"
+domain     = "where a person at ACME talks to the agents"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+# A user agent holds no model grant and no clearance. It is the surface a human
+# types into; everything it cannot do itself, it asks an app agent to do — and
+# the app agent's clearance, not the human's impatience, decides the answer.
+models = []
+tools  = []
+skills = ["explain-result"]
+peers  = ["app/social-media", "app/article-scout", "app/web-content",
+          "app/competitors", "app/market", "app/librarian"]
+
+[documents]
+clearance = "public"
+
+[quota]
+memory = "256Mi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "The console a person at ACME uses: routes a request to whichever agent can answer it, and shows what came back."
+skills      = ["console.ask"]
+inputs      = "tty"
+outputs     = "tty"
+
+[evolution]
+mode   = "self"
+allow  = ["card"]
+review = "required"

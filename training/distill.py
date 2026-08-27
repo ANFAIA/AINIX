@@ -82,16 +82,26 @@ def extract(text: str) -> dict | None:
     return d if isinstance(d.get("command"), str) and d["command"].strip() else None
 
 
-def load_prompts(train_csv: Path, test_csv: Path, limit: int) -> list[dict]:
+def load_prompts(train_csv: Path, test_csv: Path, limit: int,
+                 out: Path | None = None) -> list[dict]:
     """NL2Bash train rows that appear neither in the test split nor already in
     the training data. Contamination has to be excluded here, once, rather than
-    apologised for later."""
+    apologised for later.
+
+    Anything already distilled is excluded too, so a run that is stopped and
+    restarted continues instead of paying for the same prompts twice."""
     test = {r["nl"].strip().lower()
             for r in csv.DictReader(test_csv.open(newline=""))}
     have = set()
-    merged = ROOT / "training/data/AINIX_NEO_terminal.jsonl"
-    if merged.exists():
-        for line in merged.read_text().splitlines():
+    already = [ROOT / "training/data/AINIX_NEO_terminal.jsonl",
+               ROOT / "training/data/AINIX_NEO_v2.jsonl",
+               ROOT / "training/data/distilled.jsonl"]
+    if out is not None:
+        already.append(out)
+    for path in already:
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
             try:
                 have.add(json.loads(line)["messages"][1]["content"].strip().lower())
             except Exception:
@@ -138,15 +148,16 @@ def main() -> int:
     args = ap.parse_args()
 
     teachers = {n: load_teacher(n) for n in args.teachers}
-    rows = load_prompts(Path(args.train), Path(args.test), args.limit)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    rows = load_prompts(Path(args.train), Path(args.test), args.limit, out)
     log(f"{len(rows)} uncontaminated prompts | teachers: "
         f"{', '.join(teachers)}\n")
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
     kept = {"equivalent": 0, "reference-anchored": 0, "dropped": 0}
 
-    with out.open("w") as fh:
+    # Append: a stopped run keeps what it earned.
+    with out.open("a") as fh:
         for start in range(0, len(rows), args.chunk):
             chunk = rows[start:start + args.chunk]
 

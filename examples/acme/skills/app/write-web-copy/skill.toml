@@ -1,0 +1,8 @@
+[skill]
+name        = "write-web-copy"
+level       = "app"
+version     = "0.1.0"
+description = "Write or revise page copy that has to stay true as the product changes."
+requires_tools  = []
+requires_models = []
+protected   = false

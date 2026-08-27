@@ -1,0 +1,34 @@
+[agent]
+name       = "article-scout"
+tier       = "app"
+group      = "marketing"
+domain     = "finds outside articles worth sharing, and says why each one is worth it"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["gemma-3-1b"]
+tools  = ["web-search", "web-fetch"]
+skills = ["assess-article"]
+peers  = ["app/market"]
+
+# Public only. This agent reads the open internet and hands results to agents
+# that hold more; giving it internal access would put ACME's own material one
+# prompt injection away from a third-party page.
+[documents]
+clearance = "public"
+
+[quota]
+memory = "512Mi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Finds external articles worth sharing and scores each for relevance, freshness, and source quality."
+skills      = ["scout.find", "scout.assess"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

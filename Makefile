@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check
 
 image:
 ifeq ($(ENGINE),max)
@@ -116,3 +116,11 @@ os-boot:
 	  -drive file=build/ainix-qcow2/nixos.qcow2,format=qcow2,if=virtio,snapshot=on \
 	  -netdev user,id=n0,hostfwd=tcp::8001-:8000 -device virtio-net-pci,netdev=n0 \
 	  -nographic
+
+# ---- examples -------------------------------------------------------------
+
+# make example-check [EXAMPLE=acme] — validates an example deployment with the
+# same rules the distribution enforces on itself.
+EXAMPLE ?= acme
+example-check:
+	python3 scripts/check_agent.py examples/$(EXAMPLE)

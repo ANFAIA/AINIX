@@ -1,0 +1,8 @@
+[skill]
+name        = "analyse-competitor"
+level       = "app"
+version     = "0.1.0"
+description = "Turn observations about a competitor into what changed and what it means."
+requires_tools  = []
+requires_models = []
+protected   = false

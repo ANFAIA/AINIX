@@ -1,0 +1,8 @@
+[skill]
+name        = "brand-voice"
+level       = "app"
+version     = "0.1.0"
+description = "How ACME sounds in public, and what it never says."
+requires_tools  = []
+requires_models = []
+protected   = false

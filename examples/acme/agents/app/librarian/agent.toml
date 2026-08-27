@@ -1,0 +1,31 @@
+[agent]
+name       = "librarian"
+tier       = "app"
+group      = "documents"
+domain     = "custody of ACME's documents, and the only agent that decides who may read one"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["qwen3.5-2b"]
+tools  = ["doc-store"]
+skills = ["classify-document"]
+peers  = ["app/memory"]
+
+[documents]
+clearance = "restricted"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Holds ACME's document store and brokers every read against the requester's clearance. Agents never open a document directly."
+skills      = ["docs.read", "docs.search", "docs.classify"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

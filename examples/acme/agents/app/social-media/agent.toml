@@ -1,0 +1,33 @@
+[agent]
+name       = "social-media"
+tier       = "app"
+group      = "marketing"
+domain     = "writes and schedules posts for LinkedIn and X in ACME's voice"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+models = ["gemma-3-1b", "qwen3.5-2b"]
+tools  = ["linkedin-post", "x-post"]
+skills = ["write-social-post", "brand-voice"]
+peers  = ["app/article-scout", "app/librarian", "app/web-posts"]
+
+# Reads internal material to write about it. Cannot see confidential work —
+# an unreleased feature must not reach a draft post by accident.
+[documents]
+clearance = "internal"
+
+[quota]
+memory = "1Gi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Drafts LinkedIn and X posts in ACME's voice, and schedules them. Never publishes without a human approving the draft."
+skills      = ["social.draft", "social.schedule"]
+inputs      = "text"
+outputs     = "json"
+
+[evolution]
+mode   = "self"
+allow  = ["card", "prompt"]
+review = "required"

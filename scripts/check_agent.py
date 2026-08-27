@@ -28,7 +28,18 @@ def visible_skill_levels(tier: str) -> list[str]:
     return SKILL_LEVELS[: SKILL_LEVELS.index(tier) + 1]
 
 
-def check(agent_dir: Path, root: Path, models: set[str], known: set[str]) -> list[str]:
+def load_groups(root: Path) -> tuple[list[str], dict]:
+    """Groups and their maximum clearance. Optional — a deployment with no
+    groups.toml simply has no document classification to enforce."""
+    p = root / "groups.toml"
+    if not p.exists():
+        return [], {}
+    g = load(p)
+    return g.get("levels", {}).get("order", []), g.get("groups", {})
+
+
+def check(agent_dir: Path, root: Path, models: set[str], known: set[str],
+          levels: list[str], groups: dict) -> list[str]:
     rel = agent_dir.relative_to(root / "agents")
     errs: list[str] = []
     m = load(agent_dir / "agent.toml")
@@ -71,6 +82,33 @@ def check(agent_dir: Path, root: Path, models: set[str], known: set[str]) -> lis
         if peer_tier not in CALLABLE[tier]:
             errs.append(f"{ref}: a {tier} agent may not call a {peer_tier} agent ({peer})")
 
+    # Groups and clearance. Clearance is granted to a group and an agent may
+    # hold at most its group's level: a group is reviewed by a human and
+    # changes rarely, while agents are added weekly, so per-agent clearance
+    # alone would make every new agent a fresh chance to grant too much.
+    if groups:
+        group = a.get("group")
+        if not group:
+            errs.append(f"{ref}: no group — every agent belongs to one when "
+                        f"groups.toml exists")
+        elif group not in groups:
+            errs.append(f"{ref}: group {group!r} is not declared in groups.toml")
+
+        clearance = m.get("documents", {}).get("clearance")
+        if clearance is None:
+            errs.append(f"{ref}: documents.clearance is required")
+        elif clearance not in levels:
+            errs.append(f"{ref}: clearance {clearance!r} is not one of {levels}")
+        elif group in groups:
+            cap = groups[group].get("clearance")
+            if cap in levels and levels.index(clearance) > levels.index(cap):
+                errs.append(f"{ref}: clearance {clearance!r} is above what group "
+                            f"{group!r} may hold ({cap!r})")
+        if tier == "user" and clearance in levels and levels.index(clearance) > 0:
+            errs.append(f"{ref}: user agents may not hold clearance above "
+                        f"{levels[0]!r} — route through an app agent, the same "
+                        f"way they route model access")
+
     ev = m.get("evolution", {})
     mode = ev.get("mode", "frozen")
     if mode not in EVOLUTION_MODES:
@@ -98,6 +136,7 @@ def main() -> int:
     root = Path(sys.argv[1])
     only = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
 
+    levels, groups = load_groups(root)
     catalog = load(root / "models.toml")
     # Local runners are top-level tables; remote providers live under [remote.*]
     # and are granted as "remote.<name>".
@@ -115,7 +154,7 @@ def main() -> int:
             print(f"no such agent: {only}", file=sys.stderr)
             return 2
 
-    errs = [e for d in dirs for e in check(d, root, models, known)]
+    errs = [e for d in dirs for e in check(d, root, models, known, levels, groups)]
     for e in errs:
         print(f"error: {e}", file=sys.stderr)
     print(f"{len(dirs)} agent(s) checked, {len(errs)} error(s)")
