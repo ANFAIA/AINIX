@@ -490,3 +490,38 @@ a stall.
 The progress line now names which teachers are cooling, so a pool quietly
 collapsing to one model is visible rather than inferred later from the
 `teacher` field.
+
+## Normalising the dataset fixed the format and not the answers — 2026-08-27
+
+The data taught four competing output shapes. `training/normalize.py` converts
+them to one — wrapping bare commands, unwrapping `<reply>`, lifting fenced
+commands out of prose, dropping records that claim to be commands and are not
+usable as one, and leaving genuine Q&A in prose because forcing it into a
+command contract would invent a command the source never gave.
+
+2507 records plus 333 distilled became 2528: **2309 contract, 219 prose**,
+against 1178 contract before. Retrained on that, same recipe, same held-out 60:
+
+| | contract | runs | same utility | **correct** |
+|---|---|---|---|---|
+| base | 55/60 | 8/60 | 10/60 | **5/60** |
+| v1 (mixed shapes) | 54/60 | 27/60 | 39/60 | **22/60** |
+| v2 (normalised + distilled) | **58/60** | 25/60 | 36/60 | **20/60** |
+
+Format compliance improved, 54 → 58. **Correctness did not**: 22 → 20 is well
+inside noise at n=60. The normalisation did exactly what it was supposed to and
+that turned out not to be the bottleneck — which the earlier correction already
+implied, since the base model formats at 55/60 while answering 5/60 correctly.
+
+The 333 distilled records did not help either, and the reason is visible in
+their own metadata: 296 of them are `reference-anchored`, meaning the teacher
+never matched the reference and the record is NL2Bash's own answer with a
+borrowed explanation. That is correct data, but the model already had 2507
+records of correct-looking commands. It is not new signal.
+
+**What this rules out.** More data of the same kind, and cleaner formatting of
+the same data, do not move effect-equivalence. The two levers left are a
+teacher that actually beats the reference often enough to teach something
+(the equivalent rate is 65% in the first chunk of a run and decays as the
+endpoint saturates), and training against the outcome reward directly rather
+than on its filtered output.

@@ -1,0 +1,384 @@
+{
+  "base": {
+    "answers": 56,
+    "contract": 55,
+    "runs": 8,
+    "matches": 10,
+    "correct": 5,
+    "plausible": 5,
+    "n": 60,
+    "samples": [
+      {
+        "nl": "list non-hidden files in the current directory",
+        "ref": "ls",
+        "got": "ls -la",
+        "contract": true,
+        "ran": true,
+        "verdict": "plausible",
+        "why": "same files, different output"
+      },
+      {
+        "nl": "list all files and directories, including hidden ones, in the current directory",
+        "ref": "ls -a",
+        "got": "ls -la",
+        "contract": true,
+        "ran": true,
+        "verdict": "plausible",
+        "why": "same files, different output"
+      },
+      {
+        "nl": "list all currently open files",
+        "ref": "lsof",
+        "got": "list all currently open files",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "create a copy of /testbed/hello.php at /testbed/hello-COPY.php",
+        "ref": "cp /testbed/hello.php /testbed/hello-COPY.php",
+        "got": "create",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "create an empty file at /testbed/test.txt",
+        "ref": "touch /testbed/test.txt",
+        "got": "touch /testbed/test.txt",
+        "contract": true,
+        "ran": false,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "create a directory at /testbed/test_dir",
+        "ref": "mkdir /testbed/test_dir",
+        "got": "mkdir -p /testbed/test_dir",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "delete the file named does_not_exist.txt",
+        "ref": "rm does_not_exist.txt",
+        "got": "delete the file named does_not_exist.txt",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "print the text \"hello world\" to the console",
+        "ref": "echo hello world",
+        "got": "print the text \"hello world\" to the console",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "show the current working directory path",
+        "ref": "pwd",
+        "got": "pwd",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "display the current date and time",
+        "ref": "date",
+        "got": "date",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "display the username of the current user",
+        "ref": "whoami",
+        "got": "display_user",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "delete the empty directory named fake_dir",
+        "ref": "rmdir fake_dir",
+        "got": "delete fake_dir",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "display the name of the current shell",
+        "ref": "echo $0",
+        "got": null,
+        "contract": false,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 1"
+      },
+      {
+        "nl": "list all current environment variables",
+        "ref": "env",
+        "got": "list all current environment variables",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "display the current user's home directory path",
+        "ref": "echo $HOME",
+        "got": "get_home_directory",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "display the current user's executable search path",
+        "ref": "echo $PATH",
+        "got": "get_executable_search_path",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "show the contents of the file setup_nl2b_fs_1.sh",
+        "ref": "cat setup_nl2b_fs_1.sh",
+        "got": "show the contents of the file setup_nl2b_fs_1.sh",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "show the first five lines of setup_nl2b_fs_1.sh",
+        "ref": "head -n 5 setup_nl2b_fs_1.sh",
+        "got": "show the first five lines of setup_nl2b_fs_1.sh",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "show the final five lines of setup_nl2b_fs_1.sh",
+        "ref": "tail -n 5 setup_nl2b_fs_1.sh",
+        "got": "show the final five lines of setup_nl2b_fs_1.sh",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "display line 10 of the file setup_nl2b_fs_1.sh",
+        "ref": "sed -n 10p setup_nl2b_fs_1.sh",
+        "got": "display line 10 of the file setup_nl2b_fs_1.sh",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      }
+    ]
+  },
+  "tuned": {
+    "answers": 60,
+    "contract": 58,
+    "runs": 25,
+    "matches": 36,
+    "correct": 20,
+    "plausible": 9,
+    "n": 60,
+    "samples": [
+      {
+        "nl": "list non-hidden files in the current directory",
+        "ref": "ls",
+        "got": "ls -n",
+        "contract": true,
+        "ran": true,
+        "verdict": "plausible",
+        "why": "same files, different output"
+      },
+      {
+        "nl": "list all files and directories, including hidden ones, in the current directory",
+        "ref": "ls -a",
+        "got": "ls -la",
+        "contract": true,
+        "ran": true,
+        "verdict": "plausible",
+        "why": "same files, different output"
+      },
+      {
+        "nl": "list all currently open files",
+        "ref": "lsof",
+        "got": "ls -la",
+        "contract": true,
+        "ran": true,
+        "verdict": "plausible",
+        "why": "same files, different output"
+      },
+      {
+        "nl": "create a copy of /testbed/hello.php at /testbed/hello-COPY.php",
+        "ref": "cp /testbed/hello.php /testbed/hello-COPY.php",
+        "got": "cp -r /testbed/hello.php /testbed/hello-COPY.php",
+        "contract": true,
+        "ran": false,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "create an empty file at /testbed/test.txt",
+        "ref": "touch /testbed/test.txt",
+        "got": "touch /testbed/test.txt",
+        "contract": true,
+        "ran": false,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "create a directory at /testbed/test_dir",
+        "ref": "mkdir /testbed/test_dir",
+        "got": "mkdir -p /testbed/test_dir",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "delete the file named does_not_exist.txt",
+        "ref": "rm does_not_exist.txt",
+        "got": "rm does_not_exist.txt",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 1"
+      },
+      {
+        "nl": "print the text \"hello world\" to the console",
+        "ref": "echo hello world",
+        "got": "echo \"hello world\"",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "show the current working directory path",
+        "ref": "pwd",
+        "got": "pwd",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "display the current date and time",
+        "ref": "date",
+        "got": "date",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "display the username of the current user",
+        "ref": "whoami",
+        "got": "whoami",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "delete the empty directory named fake_dir",
+        "ref": "rmdir fake_dir",
+        "got": "rm -rf fake_dir",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "display the name of the current shell",
+        "ref": "echo $0",
+        "got": "echo $SHELL",
+        "contract": true,
+        "ran": true,
+        "verdict": "plausible",
+        "why": "same files, different output"
+      },
+      {
+        "nl": "list all current environment variables",
+        "ref": "env",
+        "got": "env",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "display the current user's home directory path",
+        "ref": "echo $HOME",
+        "got": "pwd -h",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 2"
+      },
+      {
+        "nl": "display the current user's executable search path",
+        "ref": "echo $PATH",
+        "got": "echo $PATH",
+        "contract": true,
+        "ran": true,
+        "verdict": "equivalent",
+        "why": "same output and same filesystem effect"
+      },
+      {
+        "nl": "show the contents of the file setup_nl2b_fs_1.sh",
+        "ref": "cat setup_nl2b_fs_1.sh",
+        "got": "\"command\": \"cat setup_nl2b_fs_1.sh\",",
+        "contract": false,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      },
+      {
+        "nl": "show the first five lines of setup_nl2b_fs_1.sh",
+        "ref": "head -n 5 setup_nl2b_fs_1.sh",
+        "got": "head -n 5 setup_nl2b_fs_1.sh",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 1"
+      },
+      {
+        "nl": "show the final five lines of setup_nl2b_fs_1.sh",
+        "ref": "tail -n 5 setup_nl2b_fs_1.sh",
+        "got": "tail -n 5 setup_nl2b_fs_1.sh",
+        "contract": true,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 1"
+      },
+      {
+        "nl": "display line 10 of the file setup_nl2b_fs_1.sh",
+        "ref": "sed -n 10p setup_nl2b_fs_1.sh",
+        "got": "\"command\": \"cat setup_nl2b_fs_1.sh | head -n 10\",",
+        "contract": false,
+        "ran": false,
+        "verdict": "broken",
+        "why": "exit 127"
+      }
+    ]
+  }
+}

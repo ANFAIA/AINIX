@@ -243,7 +243,7 @@ role     = "Nemotron 3 Super 120B — free, cheap failover for simple intents"
 
 [remote.qwen38-local]
 provider   = "openai-compatible"
-base_url   = "https://dfa2-136-85-24-0.ngrok-free.app/v1"
+base_url   = "https://0ba3-34-16-224-129.ngrok-free.app/v1"
 model      = "qwen3.8:27b"
 key_env    = "AINIX_TEACHER_KEY"     # value lives in .env.local, never here
 enabled    = false

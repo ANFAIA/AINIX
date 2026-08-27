@@ -52,14 +52,20 @@ def load_eval(csv_path: Path, seen: set[str], limit: int) -> list[dict]:
     return rows
 
 
-def training_prompts() -> set[str]:
-    p = ROOT / "training/data/AINIX_NEO_terminal.jsonl"
+def training_prompts(paths: list[str]) -> set[str]:
+    """Exclude what the model actually trained on. Hardcoding one filename
+    silently stops excluding anything the moment the training set is renamed,
+    and the run still prints a confident contamination count."""
     out = set()
-    for line in p.read_text().splitlines():
-        try:
-            out.add(json.loads(line)["messages"][1]["content"].strip().lower())
-        except Exception:
+    for path in paths:
+        p = ROOT / path
+        if not p.exists():
             continue
+        for line in p.read_text().splitlines():
+            try:
+                out.add(json.loads(line)["messages"][1]["content"].strip().lower())
+            except Exception:
+                continue
     return out
 
 
@@ -116,11 +122,17 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=60)
     ap.add_argument("--max-tokens", type=int, default=120)
     ap.add_argument("--out", default="docs/eval.json")
+    ap.add_argument("--trained-on", nargs="*", default=[
+        "training/data/AINIX_NEO_terminal.jsonl",
+        "training/data/AINIX_NEO_v2.jsonl",
+        "training/data/distilled.jsonl",
+        "training/data/distilled2.jsonl"],
+        help="every file the adapter may have seen; all are excluded")
     args = ap.parse_args()
 
     from mlx_lm import load, generate
 
-    seen = training_prompts()
+    seen = training_prompts(args.trained_on)
     rows = load_eval(Path(args.eval), seen, args.limit)
     print(f"{len(rows)} held-out prompts (NL2Bash test, "
           f"{len(seen)} training prompts excluded)\n")
