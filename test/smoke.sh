@@ -10,6 +10,16 @@ TIMEOUT="${TIMEOUT:-1800}"   # cold start = weight load + graph compile
 
 health() { curl -fsS "${BASE}/health" >/dev/null 2>&1 || curl -fsS "${BASE}/v1/health" >/dev/null 2>&1; }
 
+# A long timeout is right for a runner that is starting — weight load plus
+# graph compile is genuinely slow. It is wrong when no runner exists at all:
+# waiting 30 minutes for a container nobody started is a hang, not patience.
+NAME="${NAME:-ainix-runner}"
+if ! health && ! docker ps --filter "name=${NAME}" --filter status=running -q | grep -q .; then
+  echo "FAIL: nothing is serving ${BASE} and no ${NAME} container is running." >&2
+  echo "      start one first:  make run" >&2
+  exit 1
+fi
+
 echo "waiting for ${BASE} (up to ${TIMEOUT}s)"
 deadline=$(( $(date +%s) + TIMEOUT ))
 until health; do
