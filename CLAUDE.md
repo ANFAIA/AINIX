@@ -35,10 +35,11 @@ env var and values live in `.env.local` (gitignored, 600).
 ## Regression suite
 
 ```bash
-make smoke                # the runner answers
-make agent-check          # every manifest is legal
-./test/agent-policy.sh    # the capability system fails closed
-make os-eval              # the NixOS configuration type-checks
+make smoke          # the runner answers
+make agent-check    # every manifest is legal
+make policy         # grants and clearance both fail closed
+make example-check  # the worked examples still validate
+make os-eval        # the NixOS configuration type-checks
 ```
 
 Run these before saying something works.

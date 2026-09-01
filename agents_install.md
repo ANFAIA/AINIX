@@ -218,11 +218,18 @@ paid for once.
 ```bash
 make skills                     # everything, by level
 make agent-check                # every manifest still legal
-./test/agent-policy.sh          # the capability system still fails closed
+make policy                     # grants AND clearance still fail closed
+make example-check              # the worked examples still validate
 make smoke                      # the runner still answers
 ```
 
-Those four are the regression suite. Run them before claiming anything works.
+Those are the regression suite. Run them before claiming anything works.
+
+`make policy` runs both halves. `agent-policy.sh` covers grants — model, peer,
+skill level. `clearance-policy.sh` runs agentd against the ACME example and
+asserts each agent sees exactly the documents its clearance covers, and that a
+document it cannot open is **absent from the listing** rather than shown and
+refused. A title is a disclosure too.
 
 ---
 

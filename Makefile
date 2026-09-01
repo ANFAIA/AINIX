@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy
 
 image:
 ifeq ($(ENGINE),max)
@@ -124,3 +124,9 @@ os-boot:
 EXAMPLE ?= acme
 example-check:
 	python3 scripts/check_agent.py examples/$(EXAMPLE)
+
+# Both halves of the capability system: the grants, and the classification.
+policy:
+	./test/agent-policy.sh
+	@echo
+	./test/clearance-policy.sh

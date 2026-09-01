@@ -12,6 +12,11 @@ agentd holds addresses, and hands out nothing a manifest did not ask for.
               agentd holds the URL.
   skills      the level rule: a tier reads its own level and everything above
               it, never below.
+  documents   classification: an agent reads a document only if its clearance
+              is at or above the document's. Manifests declared clearance long
+              before anything enforced it; a rule that only a validator checks
+              is a comment with a test.
+  tools       a tool is reachable only if the manifest granted it by name.
   audit       every allow and every deny, with a reason.
 
 Deny is the default. Anything not explicitly granted is refused, and a refusal
@@ -25,6 +30,7 @@ import json
 import os
 import sys
 import time
+import re
 import tomllib
 import urllib.request
 from pathlib import Path
@@ -37,6 +43,12 @@ RUNNER = os.environ.get("AINIX_RUNNER", "http://127.0.0.1:8000")
 # above it — the same ordering scripts/skillctl.py enforces.
 LEVELS = ["user", "app", "system"]
 
+# Document classification, lowest to highest. An agent reads at or below its own
+# level. Loaded from groups.toml when a deployment has one; a deployment with no
+# groups.toml simply has no classified documents.
+CLEARANCE: list[str] = []
+GROUPS: dict = {}
+
 # Which tier may call which. A user agent asks app agents for work; app agents
 # do not reach back up, and only system agents may call system agents.
 MAY_CALL = {"user": {"app"}, "app": {"app"}, "system": {"user", "app", "system"}}
@@ -44,6 +56,17 @@ MAY_CALL = {"user": {"app"}, "app": {"app"}, "system": {"user", "app", "system"}
 
 def now() -> float:
     return time.monotonic()
+
+
+def load_groups() -> None:
+    global CLEARANCE, GROUPS
+    p = ROOT / "groups.toml"
+    if not p.exists():
+        return
+    with p.open("rb") as fh:
+        g = tomllib.load(fh)
+    CLEARANCE = g.get("levels", {}).get("order", [])
+    GROUPS = g.get("groups", {})
 
 
 class Registry:
@@ -113,6 +136,51 @@ def may_read_skill(caller: str, level: str) -> tuple[bool, str]:
         return True, f"{a['tier']} sees {level}"
     return False, (f"{a['tier']} agents cannot see {level} skills — {level} is "
                    f"below {a['tier']}")
+
+
+def clearance_of(name: str) -> str | None:
+    a = REG.agents.get(name)
+    return a["manifest"].get("documents", {}).get("clearance") if a else None
+
+
+def may_read_document(caller: str, doc_level: str) -> tuple[bool, str]:
+    """Read at or below your own clearance. Nothing about who is asking on
+    whose behalf — a human cleared for everything does not lend that clearance
+    to an agent by typing into it."""
+    if not CLEARANCE:
+        return True, "no classification in this deployment"
+    mine = clearance_of(caller)
+    if mine not in CLEARANCE:
+        return False, f"{caller} holds no clearance"
+    if doc_level not in CLEARANCE:
+        return False, f"unknown classification {doc_level!r}"
+    if CLEARANCE.index(doc_level) <= CLEARANCE.index(mine):
+        return True, f"{mine} covers {doc_level}"
+    return False, (f"{caller} holds {mine}; this document is {doc_level}")
+
+
+def may_use_tool(caller: str, tool: str) -> tuple[bool, str]:
+    a = REG.agents.get(caller)
+    if not a:
+        return False, "not registered"
+    if tool in a["manifest"]["agent"].get("tools", []):
+        return True, "granted by manifest"
+    return False, f"{caller} has no grant for tool {tool!r}"
+
+
+def documents() -> dict:
+    """The store, as {id: {classification, title, body}}. A directory of files
+    with a classification line, so a deployment can keep them in git and a
+    human can read them without a tool."""
+    out = {}
+    d = ROOT / "documents"
+    for p in sorted(d.glob("*.md")) if d.exists() else []:
+        text = p.read_text()
+        m = re.search(r"^classification:\s*(\w+)", text, re.M)
+        out[p.stem] = {"classification": m.group(1) if m else "public",
+                       "title": p.stem.replace("-", " "),
+                       "body": text}
+    return out
 
 
 def find_skill(name: str) -> tuple[str, Path] | tuple[None, None]:
@@ -263,6 +331,33 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter):
             await send(w, ok=ok, text=path.read_text() if ok else "",
                        error=None if ok else why)
 
+    elif op == "document":
+        docs = documents()
+        doc = docs.get(msg.get("id", ""))
+        if doc is None:
+            audit(me, "document", msg.get("id", ""), False, "no such document")
+            await send(w, ok=False, error=f"no such document: {msg.get('id')!r}")
+        else:
+            ok, why = may_read_document(me, doc["classification"])
+            audit(me, "document", f"{msg['id']}[{doc['classification']}]", ok, why)
+            await send(w, ok=ok, document=doc if ok else None,
+                       error=None if ok else why)
+
+    elif op == "documents":
+        # A listing shows only what the caller could open. Titles leak: a
+        # confidential document called "acquisition-of-globex" is a disclosure
+        # even when the body stays shut.
+        visible = {i: {"classification": d["classification"], "title": d["title"]}
+                   for i, d in documents().items()
+                   if may_read_document(me, d["classification"])[0]}
+        audit(me, "documents", "list", True, f"{len(visible)} visible")
+        await send(w, ok=True, documents=visible)
+
+    elif op == "tool":
+        ok, why = may_use_tool(me, msg.get("name", ""))
+        audit(me, "tool", msg.get("name", ""), ok, why)
+        await send(w, ok=ok, error=None if ok else why)
+
     elif op == "status":
         await send(w, ok=True, agents={n: v["tier"] for n, v in REG.agents.items()},
                    audit=AUDIT[-20:])
@@ -278,10 +373,12 @@ async def main() -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.unlink()
+    load_groups()
     server = await asyncio.start_unix_server(handle, str(path))
     os.chmod(path, 0o660)
-    print(f"agentd listening on {path} | runner {RUNNER}", file=sys.stderr,
-          flush=True)
+    print(f"agentd listening on {path} | runner {RUNNER}"
+          + (f" | clearance {'<'.join(CLEARANCE)}" if CLEARANCE else ""),
+          file=sys.stderr, flush=True)
     async with server:
         await server.serve_forever()
     return 0

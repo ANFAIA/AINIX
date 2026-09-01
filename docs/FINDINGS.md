@@ -586,3 +586,43 @@ a bare name — and leaves anything that resolves to nothing broken. In run 4 it
 turned `app/console` into `user/console`, which the tier rule then rejected as
 an illegal edge. That is the correct layering: the repair made the reference
 resolvable, and the rule that should catch it did.
+
+## Clearance is now enforced, not merely validated — 2026-08-27
+
+Manifests declared `documents.clearance` and the validator checked it against
+the group ceiling, but nothing enforced it at runtime. A rule only a validator
+checks is a comment with a test attached.
+
+`agentd` now brokers documents the same way it brokers models: it holds the
+store, compares each document's classification against the requester's
+clearance, and audits the decision. Agents never open a file.
+
+`test/clearance-policy.sh` runs it against the ACME example, whose agents span
+every level — 11 assertions, all passing:
+
+```
+  ok   public agent sees only the public document           1
+  ok   internal agent sees public + internal                2
+  ok   confidential agent adds the roadmap                  3
+  ok   the librarian sees everything it guards              4
+  ok   marketing may NOT read the roadmap                   DENIED
+  ok   the scout that reads the web gets nothing internal   DENIED
+  ok   nobody but the librarian reads personal records      DENIED
+  ok   ungranted tool is refused                            DENIED
+```
+
+### A listing shows only what the caller could open
+
+`documents` filters rather than marking entries as forbidden. A confidential
+document titled "acquisition-of-globex" discloses the acquisition whether or
+not the body opens, so an agent that cannot read it does not learn it exists.
+
+### Clearance is the agent's, never the human's
+
+`may_read_document` looks only at the calling agent. A person cleared for
+everything does not lend that clearance to an agent by typing into it — the
+console holds `public` precisely because it is what an attacker reaches first.
+
+Tool grants are enforced on the same path: `agent.tool(name)` asks agentd, and
+an ungranted tool raises `Denied` before any implementation is bound. The grant
+is the permission; a deployment supplies the code.

@@ -20,13 +20,14 @@ narrating.
 | `.claude/settings.json` | read-only commands pre-allowed, so checks do not prompt |
 
 ```bash
-make smoke                # the runner answers
-make agent-check          # every manifest is legal
-./test/agent-policy.sh    # the capability system fails closed
-make os-eval              # the NixOS configuration type-checks
+make smoke          # the runner answers
+make agent-check    # every manifest is legal
+make policy         # grants and clearance both fail closed
+make example-check  # the worked examples still validate
+make os-eval        # the NixOS configuration type-checks
 ```
 
-Those four are the regression suite. Run them before claiming anything works.
+Those five are the regression suite. Run them before claiming anything works.
 
 One house rule above the others: **run it, do not describe it.** Nearly every
 check in this project's history turned up a real breakage that reading the code

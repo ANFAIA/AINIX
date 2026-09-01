@@ -97,6 +97,21 @@ class Peer:
         return r["output"]
 
 
+class Tool:
+    """A tool the manifest granted. agentd checks the grant; the call itself is
+    local, because a tool that runs somewhere else is a peer, not a tool."""
+
+    def __init__(self, conn: Conn, name: str):
+        self._conn, self.name = conn, name
+        conn.call("tool", name=name)      # raises Denied if not granted
+
+    def run(self, *args, **kw):
+        raise NotImplementedError(
+            f"tool {self.name!r} is granted but has no implementation bound. "
+            "A deployment supplies these; the grant is the permission, not the "
+            "code.")
+
+
 class Agent:
     def __init__(self, manifest: dict, conn: Conn):
         self.manifest, self._conn = manifest, conn
@@ -122,6 +137,22 @@ class Agent:
         if name not in self.manifest["agent"].get("peers", []):
             raise Denied(f"{self.name} does not list {name!r} as a peer")
         return Peer(self._conn, name)
+
+    def tool(self, name: str) -> Tool:
+        if name not in self.manifest["agent"].get("tools", []):
+            raise Denied(f"{self.name} has no grant for tool {name!r}")
+        return Tool(self._conn, name)
+
+    def document(self, doc_id: str) -> dict:
+        """Read one document. agentd compares its classification against this
+        agent's clearance — the agent never opens a file itself."""
+        return self._conn.call("document", id=doc_id)["document"]
+
+    def documents(self) -> dict:
+        """Everything this agent may open, by id. A document it cannot read is
+        absent from the listing rather than shown and refused: a title is a
+        disclosure too."""
+        return self._conn.call("documents")["documents"]
 
     def discover(self, skill: str) -> list[dict]:
         """Find agents by what they can do, not by where they live."""
