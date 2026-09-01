@@ -13,6 +13,7 @@ peers  = ["app/memory"]
 
 [documents]
 clearance = "restricted"
+justification = "Holds the document store itself, including contracts and personal data, because it is the agent that refuses those reads to everyone else"
 
 [quota]
 memory = "1Gi"

@@ -12,7 +12,7 @@ skills = ["draft-release-notes"]
 peers  = ["app/knowledge-broker", "app/dependency-reviewer"]
 
 [documents]
-clearance = "restricted"
+clearance = "confidential"
 
 [quota]
 memory = "1Gi"

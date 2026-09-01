@@ -14,7 +14,7 @@ clearance   = "public"
 
 [groups.engineering]
 description = "Bug triage, release notes drafting, and dependency security review. Sees unreleased work."
-clearance   = "restricted"
+clearance   = "confidential"
 
 [groups.finance]
 description = "Invoicing, budget tracking, and renewal forecasting. Custody of contract values."

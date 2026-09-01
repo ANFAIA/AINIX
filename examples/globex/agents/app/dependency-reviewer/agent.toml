@@ -12,7 +12,7 @@ skills = ["review-dependency"]
 peers  = ["app/knowledge-broker", "app/bug-triager"]
 
 [documents]
-clearance = "restricted"
+clearance = "confidential"
 
 [quota]
 memory = "1Gi"

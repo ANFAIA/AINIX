@@ -104,6 +104,18 @@ def check(agent_dir: Path, root: Path, models: set[str], known: set[str],
             if cap in levels and levels.index(clearance) > levels.index(cap):
                 errs.append(f"{ref}: clearance {clearance!r} is above what group "
                             f"{group!r} may hold ({cap!r})")
+        # The top level has to be argued for. Over-classification is free
+        # otherwise: nobody is ever blamed for granting too much, so clearance
+        # drifts upward until the label means nothing. A sentence naming the
+        # material is cheap for a genuine case and awkward for a reflex.
+        if clearance == levels[-1] if levels else False:
+            why = m.get("documents", {}).get("justification", "").strip()
+            if len(why) < 20:
+                errs.append(f"{ref}: clearance {clearance!r} requires "
+                            f"documents.justification naming the material that "
+                            f"needs it — credentials, personal data, or legal "
+                            f"matter, not commercial secrecy")
+
         if tier == "user" and clearance in levels and levels.index(clearance) > 0:
             errs.append(f"{ref}: user agents may not hold clearance above "
                         f"{levels[0]!r} — route through an app agent, the same "

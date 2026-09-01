@@ -525,3 +525,64 @@ teacher that actually beats the reference often enough to teach something
 (the equivalent rate is 65% in the first chunk of a run and decays as the
 endpoint saturates), and training against the outcome reward directly rather
 than on its filtered output.
+
+## Four runs of a model designing an agent org — 2026-08-27
+
+Same brief, same model (MiniMax M3), four generations through
+`scripts/generate_org.py`. The interesting result is not that it works; it is
+*which* rules it breaks.
+
+| run | agents | validator errors | `restricted` | what broke |
+|---|---|---|---|---|
+| 1 | 14 | 16 | 4/14 | every peer written `knowledge.broker`, not `app/knowledge-broker` |
+| 2 | 10 | 1 | 5/10 | user console granted an app-level skill |
+| 3 | 8 | 0 | 5/8 | nothing — but over-classified badly |
+| 4 | 8 | 7 | 3/8 | six app agents naming the user console as a peer |
+
+### It gets attributes right and relationships wrong
+
+Tier, group, and the clearance ceiling passed in every run. What failed, every
+time, was **relational**: which agent may name which, and at what level a skill
+has to live for its holder to see it. The model reasons well about a single
+agent in isolation and poorly about the edges between them — so a generated org
+is worth having only alongside something that checks the graph.
+
+The peer-direction error is the most persistent. Run 4 had six app agents
+listing `user/console` as a peer, which inverts the whole design: the console
+asks app agents for work, never the reverse. The contract says so in one line,
+and the model overrode it four times out of four, presumably because "everyone
+reports to the console" is the shape orgs usually have.
+
+### Instruction did not fix over-classification. A check did.
+
+Run 3 put five of eight agents at `restricted` — finance, engineering, people —
+after the contract was amended to say, explicitly, that commercial secrecy is
+`confidential` and `restricted` is for material whose leak harms a person. The
+instruction made it *worse* than run 2.
+
+What worked was making the top level cost something. `check_agent.py` now
+requires `documents.justification` — one sentence naming the material — for any
+agent at the highest level:
+
+```
+error: app/librarian: clearance 'restricted' requires documents.justification
+       naming the material that needs it — credentials, personal data, or
+       legal matter, not commercial secrecy
+```
+
+Run 4, with that rule in the contract: `restricted` fell from 5/8 to 3/8, and
+two of the three carried a real justification. The third was caught.
+
+The rule immediately found over-classification in the **hand-written** ACME
+example too — `librarian` had `restricted` with no argument for it — and three
+Globex engineering agents that were `restricted` for commercial secrecy and are
+now `confidential`. Over-classifying is free until something makes it cost a
+sentence; nobody is ever blamed for granting too much.
+
+### The repair layer must not hide the error
+
+`normalise_peers()` rewrites mechanically wrong references — a dot for a slash,
+a bare name — and leaves anything that resolves to nothing broken. In run 4 it
+turned `app/console` into `user/console`, which the tier rule then rejected as
+an illegal edge. That is the correct layering: the repair made the reference
+resolvable, and the rule that should catch it did.

@@ -49,6 +49,18 @@ GROUPS AND CLEARANCE
 - Give each agent the LOWEST clearance that still lets it work. An agent that
   reads untrusted external content (web pages, email, user uploads) must hold
   `public` — it is the one most likely to be turned against you.
+- `restricted` is for credentials, personal data, and legal matters — material
+  whose leak harms a PERSON. Commercial secrecy is `confidential`. A finance or
+  strategy function is confidential, not restricted. Over-classifying is not
+  the safe default it looks like: when everything is restricted, the label stops
+  meaning anything and nobody can do their job.
+- An agent at `restricted` must also carry "justification": one sentence naming
+  the material that needs it. If you cannot name credentials, personal data, or
+  a legal matter, the agent is `confidential` and not `restricted`.
+- Every skill you attach to a `user` agent must itself be level "user". A user
+  agent cannot see app-level skills, so granting it one is rejected. If the
+  skill is about the human surface — routing, rendering, confirming — it IS a
+  user skill; write it at that level rather than raising what the console sees.
 
 DESIGN RULES
 - No agent gets a tool it does not use, or a peer it never calls.
@@ -63,6 +75,7 @@ Answer with ONLY a JSON object, no prose and no code fence:
   "groups": {"<name>": {"description": "...", "clearance": "internal"}},
   "agents": [
     {"name": "...", "tier": "app", "group": "...", "clearance": "internal",
+     "justification": "only when clearance is restricted",
      "domain": "one line, lowercase, what it is for",
      "models": ["..."], "tools": ["..."], "peers": ["app/other"],
      "card": "one sentence a peer reads to decide whether to call it",
@@ -86,6 +99,11 @@ def extract_json(text: str) -> dict | None:
         return json.loads(m.group(0))
     except json.JSONDecodeError:
         return None
+
+
+def justification_line(a: dict) -> str:
+    j = (a.get("justification") or "").strip()
+    return f"justification = {json.dumps(j)}\n" if j else ""
 
 
 def normalise_peers(spec: dict) -> list[str]:
@@ -148,7 +166,7 @@ peers  = {json.dumps(a.get("peers", []))}
 
 [documents]
 clearance = {json.dumps(a.get("clearance", "public"))}
-
+{justification_line(a)}
 [quota]
 memory = "1Gi"
 cpu    = "1"

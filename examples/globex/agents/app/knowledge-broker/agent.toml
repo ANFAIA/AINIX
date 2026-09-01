@@ -13,6 +13,7 @@ peers  = ["app/lead-qualifier", "app/sequence-drafter", "app/ticket-responder", 
 
 [documents]
 clearance = "restricted"
+justification = "Custody of every Globex document, including employee records and signed contracts, so it must read what it refuses to others"
 
 [quota]
 memory = "1Gi"
