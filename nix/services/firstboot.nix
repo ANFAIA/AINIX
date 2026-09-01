@@ -7,6 +7,16 @@
 
 let cfg = config.ainix.firstboot; in
 {
+  options.ainix.firstboot.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = ''
+      Ask on first boot. A test image turns this off: firstboot owns the
+      console until a human answers, which is right for a real machine and
+      wrong for an automated boot check.
+    '';
+  };
+
   options.ainix.firstboot.tty = lib.mkOption {
     type = lib.types.str;
     default = "tty1";
@@ -18,7 +28,8 @@ let cfg = config.ainix.firstboot; in
     '';
   };
 
-  config.systemd.services.ainix-firstboot = {
+  config = lib.mkIf cfg.enable {
+  systemd.services.ainix-firstboot = {
     description = "AINIX first-boot setup (network, then model)";
     wantedBy = [ "multi-user.target" ];
     before = [ "getty@${cfg.tty}.service" "serial-getty@${cfg.tty}.service" "ainix-runner.service" ];
@@ -36,6 +47,9 @@ let cfg = config.ainix.firstboot; in
         "AINIX_STATE=/var/lib/ainix/state.toml"
         "AINIX_WEIGHTS=/var/lib/ainix/weights"
         "AINIX_CATALOG=/etc/ainix/models.toml"
+        # Derived from __file__ on a checkout, but the image puts the script at
+        # /etc/ainix/firstboot and the fetcher somewhere else entirely.
+        "AINIX_FETCH=/etc/ainix/fetch-model.sh"
         "PATH=${lib.makeBinPath (with pkgs; [ curl networkmanager coreutils ])}"
       ];
 
@@ -47,5 +61,6 @@ let cfg = config.ainix.firstboot; in
       TTYReset = true;
       TTYVHangup = true;
     };
+  };
   };
 }

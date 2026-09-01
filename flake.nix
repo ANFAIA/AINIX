@@ -23,6 +23,7 @@
         ./nix/kernel.nix
         ./nix/tuning.nix
         ./nix/services/runner.nix
+        ./nix/services/agentd.nix
         ./nix/services/firstboot.nix
         (./nix/profiles + "/${profile}.nix")
       ];
@@ -52,6 +53,9 @@
               imports = [ (modulesPath + "/installer/netboot/netboot.nix") ];
               ainix.disk.enable = false;   # no disk at all: kernel + initrd only
               ainix.firstboot.tty = "ttyAMA0";   # serial is the only console here
+              # A boot check cannot answer a question. firstboot owns the
+              # console until a human does, which is right on a real machine.
+              ainix.firstboot.enable = false;
             })
           ];
         };

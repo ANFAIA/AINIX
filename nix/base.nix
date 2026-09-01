@@ -58,4 +58,11 @@
   # The catalog and the first-boot agent travel with the system.
   environment.etc."ainix/models.toml".source = "${ainixSrc}/models.toml";
   environment.etc."ainix/firstboot".source = "${ainixSrc}/agents/system/firstboot";
+  # A self-check a human can run on the booted machine: register with agentd,
+  # ask for a skill, list who is home.
+  environment.etc."ainix/probe.py".source = "${ainixSrc}/agents/system/agentd/probe.py";
+  environment.etc."ainix/fetch-model.sh" = {
+    source = "${ainixSrc}/scripts/fetch-model.sh";
+    mode = "0755";
+  };
 }

@@ -626,3 +626,48 @@ console holds `public` precisely because it is what an attacker reaches first.
 Tool grants are enforced on the same path: `agent.tool(name)` asks agentd, and
 an ungranted tool raises `Denied` before any implementation is bound. The grant
 is the permission; a deployment supplies the code.
+
+## The agent plane runs on the booted image — 2026-08-27
+
+`nix/services/agentd.nix` puts the broker in the image, ordered before an
+`ainix-agents.target` that agents attach to, so a deployment adds an agent
+without editing the broker's unit. Verified from inside a booted VM:
+
+```
+srw-rw---- 1 ainix-agentd ainix 0 agentd.sock
+REGISTER: {'ok': True, 'name': 'system/probe'}
+SKILL: True
+AGENTS: ['system/probe']
+```
+
+A process in a login session registers with the broker, is granted a
+system-level skill, and appears in the registry — on the distribution, not on
+a developer's laptop.
+
+### `DynamicUser` made the broker unreachable
+
+The first version hardened agentd with `DynamicUser = true`, which is the right
+default for a service that talks only to itself. Here it is exactly wrong: the
+socket ends up owned by a transient uid, and
+
+```
+ls: cannot open directory '/run/ainix/': Permission denied
+```
+
+is what every agent on the machine gets. A broker nothing can reach is a
+broker that enforces nothing.
+
+It now runs as a fixed `ainix-agentd` user in an `ainix` group, with the
+runtime directory at `0770`. **Membership in that group is what "may speak to
+the broker" means** — one readable fact instead of a systemd side effect.
+
+### Two smaller things the boot found
+
+`firstboot` could not download on the image: its fetcher path is derived from
+`__file__`, which is right in a checkout and wrong at `/etc/ainix/firstboot`.
+The script is packaged now and the unit passes `AINIX_FETCH`.
+
+`firstboot` also owns the console until a human answers, which is correct on a
+real machine and impossible for an automated boot check — the check answered
+its model prompt by accident and set off a download. It is now behind
+`ainix.firstboot.enable`, off in the test image only.
