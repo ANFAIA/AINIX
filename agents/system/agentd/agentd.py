@@ -42,6 +42,7 @@ import re
 import socket
 import struct
 import tomllib
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -326,8 +327,17 @@ def infer(model: str, messages: list, thinking: bool = False,
     req = urllib.request.Request(f"{RUNNER}/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        d = json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:
+            d = json.load(r)
+    except urllib.error.HTTPError as e:
+        # The runner says why — context overflow, model still loading — and
+        # "HTTPError" alone sent the reader into a VM to find out.
+        try:
+            why = json.loads(e.read()).get("error", {}).get("message", "")
+        except Exception:
+            why = ""
+        raise RuntimeError(f"runner answered {e.code}: {why or e.reason}") from None
     return d["choices"][0]["message"].get("content") or ""
 
 
@@ -370,7 +380,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
                       f"internal error: {type(e).__name__}: {e}")
                 await send(writer, ok=False,
                            error=f"agentd failed on {msg.get('op')!r}: "
-                                 f"{type(e).__name__}")
+                                 f"{type(e).__name__}: {str(e)[:200]}")
     except (ConnectionResetError, asyncio.IncompleteReadError):
         pass
     finally:

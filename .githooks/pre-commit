@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# The fast half of `make test`: lint and every manifest, in a few seconds. The
+# policy suites and the image run in CI; this is here because a commit once
+# went in red when the check ran in a chain whose exit status did not gate it.
+#
+#   git config core.hooksPath .githooks
+set -euo pipefail
+make --no-print-directory lint agent-check >/dev/null || {
+  echo "pre-commit: make lint agent-check failed — run it to see why" >&2
+  exit 1
+}
+for ex in examples/*/; do
+  [ -d "$ex/agents" ] || continue      # examples/orgs holds briefs, not a deployment
+  python3 scripts/check_agent.py "$ex" >/dev/null || {
+    echo "pre-commit: $ex does not validate" >&2; exit 1; }
+done

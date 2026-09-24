@@ -8,6 +8,9 @@
 {
   system.stateVersion = "25.05";
 
+  # One llama.cpp for the laptop runner and the image — see nix/pkgs/llama-cpp.nix.
+  nixpkgs.overlays = [ (import ./pkgs/llama-cpp.nix) ];
+
   # --- what is NOT here -----------------------------------------------------
   documentation.enable = false;          # ~200 MB of man/info/doc
   documentation.nixos.enable = false;

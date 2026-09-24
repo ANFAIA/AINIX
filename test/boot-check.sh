@@ -16,7 +16,8 @@ accel="-accel tcg"; cpu="-cpu max"
 if [ "$(uname -s)" = Darwin ]; then accel="-accel hvf"; cpu="-cpu host"; fi
 if [ -w /dev/kvm ]; then accel="-accel kvm"; cpu="-cpu host"; fi
 
-log=$(mktemp)
+# Kept, so a FAIL can be read after the VM is gone.
+log=build/boot/selftest.log
 timeout 300 qemu-system-aarch64 -M virt $cpu $accel -smp 4 -m 8192 \
   -kernel build/boot/kernel -initrd build/boot/initrd \
   -append "$(cat build/boot/cmdline) ainix.selftest" \

@@ -29,11 +29,16 @@ in
       StandardOutput = "journal+console";
       StandardError = "journal+console";
     };
-    path = with pkgs; [ systemd sudo coreutils gnugrep ];
+    path = with pkgs; [ systemd sudo coreutils gnugrep iptables llama-cpp curl ];
     script = ''
       fail=0
       say() { echo "AINIX-SELFTEST $*"; }
-      check() { if eval "$2" >/dev/null 2>&1; then say "ok   $1"; else say "FAIL $1"; fail=1; fi; }
+      # A failure prints the last lines of what the check said: a verdict of
+      # FAIL with no reason sends whoever reads it back into the VM to find one.
+      check() {
+        if out=$(eval "$2" 2>&1); then say "ok   $1"
+        else say "FAIL $1"; printf '%s\n' "$out" | tail -4 | sed 's/^/AINIX-SELFTEST        /'; fail=1; fi
+      }
 
       # Give agents a moment to register after the target is reached.
       for _ in $(seq 30); do
@@ -52,6 +57,23 @@ in
       # agent: the human login user. It must be refused by uid.
       check "a non-agent uid cannot act as an agent" \
         "! sudo -u ainix AINIX_SOCK=${cfg.socket} ${py} ${probe}"
+      # The property, not the label: a nixpkgs build carries no git metadata
+      # and reports "build 0", so the version string proves nothing. What
+      # matters is that this engine can load the catalog's Qwen3.5 models,
+      # which the b5311 nixpkgs ships could not ("unknown architecture qwen35").
+      check "the image's llama.cpp knows the qwen35 architecture" \
+        "grep -q qwen35 ${pkgs.llama-cpp}/lib/libllama.so"
+      check "the runner port is not open to the network" \
+        "! iptables -S 2>/dev/null | grep -q -- '--dport ${toString config.ainix.runner.port}'"
+      ${lib.optionalString (config.ainix.runner.modelFile != null) ''
+      for _ in $(seq 60); do curl -fsS http://127.0.0.1:${toString config.ainix.runner.port}/health >/dev/null 2>&1 && break; sleep 1; done
+      check "the runner serves, on loopback" \
+        "curl -fsS http://127.0.0.1:${toString config.ainix.runner.port}/health"
+      check "agent units may open Unix sockets only" \
+        "systemctl show -p RestrictAddressFamilies ainix-agent-app-shell-expert | grep -qx 'RestrictAddressFamilies=AF_UNIX'"
+      check "console -> shell-expert -> model, end to end" \
+        "sudo -u ainix-user-shell AINIX_SOCK=${cfg.socket} PYTHONPATH=${cfg.root}/agents/lib ${py} ${cfg.root}/agents/system/agentd/e2e.py ${cfg.root}"
+      ''}
       check "the refusal names the uid" \
         "journalctl -u ainix-agentd -o cat | grep -q 'peer uid .* is not ainix-user-shell'"
 

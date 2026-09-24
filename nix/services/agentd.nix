@@ -83,7 +83,11 @@ in
         Group = "ainix";
         RuntimeDirectory = "ainix";
         RuntimeDirectoryMode = "0770";
-        StateDirectory = "ainix";
+        # Its own state directory. It used to share StateDirectory=ainix, and
+        # systemd hands a StateDirectory to the unit's user: /var/lib/ainix —
+        # first boot's state and the model weights — became ainix-agentd's.
+        StateDirectory = "ainix-agentd";
+        StateDirectoryMode = "0700";
         ProtectSystem = "strict";
         ProtectHome = true;
         PrivateTmp = true;

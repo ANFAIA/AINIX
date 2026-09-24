@@ -59,6 +59,18 @@
               # console until a human does, which is right on a real machine.
               ainix.firstboot.enable = false;
             })
+            # A 105 MB instruct model, fetched by hash, so the self-test
+            # exercises the runner and the full agent -> agentd -> model path on
+            # every boot check. The runner never served on the image before
+            # this. Not the 19 MB stories15M: it trains at 128 tokens of
+            # context, and llama.cpp caps each slot there, so shell-expert's
+            # real system prompt (348 tokens) was rejected outright.
+            ({ pkgs, ... }: {
+              ainix.runner.modelFile = pkgs.fetchurl {
+                url = "https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q4_K_M.gguf";
+                hash = "sha256-LoBAzq54Favg3LNUC5mV6qH6DSyp55fQpjWuRDPGjC0=";
+              };
+            })
           ];
         };
 

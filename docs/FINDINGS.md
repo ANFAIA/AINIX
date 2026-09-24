@@ -876,3 +876,53 @@ list-units 'ainix-agent-*'`, found none, **checked nothing, and printed PASS**.
 The expected units now come from the Nix configuration at evaluation time, and
 an empty list is itself a failure. A test that can pass by finding nothing to
 test is a test of the pattern it greps for.
+
+## The runner had never served on the image — 2026-09-25
+
+Every earlier boot test disabled first boot, and the runner only starts once
+first boot has chosen a model, so on the distribution itself the runner had
+never once answered a request. The self-test image now carries a model (fetched
+by hash) and checks the whole path. Getting it green found four bugs, none of
+which any earlier test could have seen:
+
+1. **The image could not load most of the catalog.** nixpkgs 25.05 ships
+   llama.cpp b5311 (May 2025): `unknown model architecture: 'qwen35'`. The
+   laptop runner is b11151. `nix/pkgs/llama-cpp.nix` pins the image to the same
+   build; the self-test checks the engine knows `qwen35` — the property, not
+   the version string, which a nixpkgs build reports as `build 0`. The check
+   was run against b5311 first to make sure it fails there.
+2. **The runner listened on 0.0.0.0 with its port open in the firewall.**
+   Anyone on the network could use the model directly — no grant, no identity,
+   no audit line. It binds loopback now (`ainix.runner.listen`), the port opens
+   only if someone deliberately exposes it, and the self-test checks the
+   firewall.
+3. **No context size was set on the image.** The container sets 4096; the image
+   set nothing, and llama.cpp b11151 then takes the training context — for
+   Qwen3.5 that is 262,144 tokens *per slot*, 518,912 in total. The image and
+   the laptop differed in KV-cache size by two orders of magnitude.
+   `ainix.runner.contextSize` defaults to 4096.
+4. **Two services claimed `/var/lib/ainix`.** The runner declared it as a
+   `DynamicUser` state directory (systemd migrates those into
+   `/var/lib/private`), agentd declared it too (systemd chowns a state
+   directory to the unit's user), and first boot writes its state and the
+   weights there as root. The runner writes nothing and now declares no state
+   directory; agentd has its own, `/var/lib/ainix-agentd`, mode 0700.
+
+The test model itself took two tries. The 19 MB `stories15M` trains at 128
+tokens and llama.cpp caps each slot at the training context, so shell-expert's
+real 348-token system prompt was rejected — which surfaced as a bare
+`HTTPError` until agentd started passing the runner's own error message
+through. The self-test image uses SmolLM2-135M-Instruct (105 MB, 8K context).
+
+```
+  ok   the image's llama.cpp knows the qwen35 architecture
+  ok   the runner port is not open to the network
+  ok   the runner serves, on loopback
+  ok   agent units may open Unix sockets only
+  ok   console -> shell-expert -> model, end to end
+  PASS            (11 of 11)
+```
+
+The selftest prints the last lines of a failing check's output, and
+`boot-check` keeps the console log in `build/boot/selftest.log`: a FAIL with no
+reason sends whoever reads it back into a VM to find one.
