@@ -30,11 +30,27 @@
         (./nix/profiles + "/${profile}.nix")
       ];
 
+      # What the image is built from: the parts it executes, not the repo.
+      # Referencing ./. put the whole tree in the world-readable Nix store —
+      # docs, training scripts, and examples/acme/documents with its
+      # "restricted" fixture. Documents in particular must never enter the
+      # store: nothing there can be kept from any process on the machine.
+      ainixSrc = nixpkgs.lib.fileset.toSource {
+        root = ./.;
+        fileset = nixpkgs.lib.fileset.unions [
+          ./agents
+          ./skills
+          ./models.toml
+          ./scripts/check_agent.py
+          ./scripts/fetch-model.sh
+        ];
+      };
+
       mkSystem = { system, profile ? "cpu", extra ? [ ] }:
         nixpkgs.lib.nixosSystem {
           inherit system;
           modules = modulesFor profile ++ extra;
-          specialArgs = { ainixSrc = ./.; };
+          specialArgs = { inherit ainixSrc; };
         };
 
       forAll = f: nixpkgs.lib.genAttrs systems f;
@@ -94,7 +110,7 @@
             inherit system;
             format = "qcow";
             modules = modulesFor "cpu";
-            specialArgs = { ainixSrc = ./.; };
+            specialArgs = { inherit ainixSrc; };
           };
 
           # kernel + initrd side by side, ready for `qemu -kernel -initrd`.

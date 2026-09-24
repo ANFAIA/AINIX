@@ -58,6 +58,9 @@ in
         # Every agent on the image runs as its own ainix-<tier>-<name> user
         # (nix/services/agents.nix), so a name is accepted only from that uid.
         AINIX_IDENTITY = "uid";
+        # Out of the Nix store, which every process can read. Provisioned by
+        # the deployment, never built into the image.
+        AINIX_DOCUMENTS = "/var/lib/ainix-agentd/documents";
         PYTHONPATH = "${cfg.root}/agents/lib";
         # systemd services get no LANG, so Python falls back to ASCII and the
         # first SKILL.md with an em dash kills the read. The code says utf-8

@@ -926,3 +926,31 @@ through. The self-test image uses SmolLM2-135M-Instruct (105 MB, 8K context).
 The selftest prints the last lines of a failing check's output, and
 `boot-check` keeps the console log in `build/boot/selftest.log`: a FAIL with no
 reason sends whoever reads it back into a VM to find one.
+
+## The whole repository was in the image, documents included — 2026-09-25
+
+The flake passed `./.` to every module, and referencing any subpath of it puts
+the entire tree in the Nix store. The booted image carried the repo — docs,
+training scripts, and `examples/acme/documents` with its "restricted" personal-
+records fixture — under a world-readable `/nix/store/...-source`. The Nix store
+is readable by every process on the machine, so a classified document there is
+readable by any agent without asking agentd, whatever its clearance.
+
+- The image is built from a fileset of what it executes — `agents/`, `skills/`,
+  `models.toml`, and the two scripts it runs. Nothing else enters the store.
+- agentd reads documents from `AINIX_DOCUMENTS`; the image points it at
+  `/var/lib/ainix-agentd/documents`, mode 0700, owned by the broker. Documents
+  are provisioned by the deployment and never built into the image.
+- The self-test checks that no `documents` directory exists anywhere in the
+  system closure and that the repository is not in it. Both pass by finding
+  nothing, so a third check first proves the closure was actually listed — the
+  vacuous pass again, avoided this time rather than discovered.
+
+## Forgetting one line published a document
+
+A document with no `classification:` line was served as `public` — to every
+agent, including the one that reads the open internet. Unlabelled, or labelled
+with a level the deployment does not have, now means the highest level.
+Verified both ways: against the previous broker the new test fails (the
+public-clearance scout receives the document); against the fixed one it
+passes. `test/clearance-policy.sh` is at 15.

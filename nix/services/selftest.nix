@@ -29,7 +29,7 @@ in
       StandardOutput = "journal+console";
       StandardError = "journal+console";
     };
-    path = with pkgs; [ systemd sudo coreutils gnugrep iptables llama-cpp curl ];
+    path = with pkgs; [ systemd sudo coreutils gnugrep iptables llama-cpp curl findutils nix ];
     script = ''
       fail=0
       say() { echo "AINIX-SELFTEST $*"; }
@@ -74,6 +74,15 @@ in
       check "console -> shell-expert -> model, end to end" \
         "sudo -u ainix-user-shell AINIX_SOCK=${cfg.socket} PYTHONPATH=${cfg.root}/agents/lib ${py} ${cfg.root}/agents/system/agentd/e2e.py ${cfg.root}"
       ''}
+      # Nothing classified may live in the store: every process can read it.
+      # Both checks below pass by finding nothing, so first prove the closure
+      # was actually listed — an empty list would make them pass vacuously.
+      check "the system closure can be listed" \
+        "[ \$(nix-store -qR /run/current-system | wc -l) -gt 100 ]"
+      check "no documents directory anywhere in the system closure" \
+        "! for p in \$(nix-store -qR /run/current-system); do [ -d \"\$p\" ] && find \"\$p\" -maxdepth 4 -type d -name documents; done | grep -q ."
+      check "the repository is not in the image, only what it runs" \
+        "! for p in \$(nix-store -qR /run/current-system | grep -- -source\$); do [ -e \"\$p/training\" ] && echo \$p; done | grep -q ."
       check "the refusal names the uid" \
         "journalctl -u ainix-agentd -o cat | grep -q 'peer uid .* is not ainix-user-shell'"
 

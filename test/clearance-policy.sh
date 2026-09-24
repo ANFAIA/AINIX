@@ -57,8 +57,13 @@ check "internal agent sees public + internal"             2 \
   "len(load('$A/social-media/agent.toml').documents())"
 check "confidential agent adds the roadmap"               3 \
   "len(load('$A/competitors/agent.toml').documents())"
-check "the librarian sees everything it guards"           4 \
+check "the librarian sees everything it guards"           5 \
   "len(load('$A/librarian/agent.toml').documents())"
+
+check "an unlabelled document is not public"               DENIED \
+  "load('$A/article-scout/agent.toml').document('unlabelled-note')"
+check "unlabelled means the highest level, not the lowest" restricted \
+  "load('$A/librarian/agent.toml').document('unlabelled-note')['classification']"
 
 echo
 echo "reads across the line"

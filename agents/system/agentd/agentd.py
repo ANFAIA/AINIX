@@ -50,6 +50,13 @@ ROOT = Path(os.environ.get("AINIX_ROOT", Path(__file__).resolve().parents[3]))
 SOCK = os.environ.get("AINIX_SOCK", "/run/ainix/agentd.sock")
 RUNNER = os.environ.get("AINIX_RUNNER", "http://127.0.0.1:8000")
 
+# Where classified documents live. NOT under ROOT on the image: ROOT is a Nix
+# store path, and the Nix store is readable by every process on the machine —
+# a document placed there is readable by any agent without asking agentd,
+# whatever its classification. The image points this at a 0700 directory
+# owned by the broker.
+DOCUMENTS = Path(os.environ.get("AINIX_DOCUMENTS", ROOT / "documents"))
+
 # "uid": a name is accepted only from the uid of the system user
 #        ainix-<tier>-<name>, which is how the image runs each agent.
 # "name": the manifest still comes from disk, but any local process in the
@@ -270,11 +277,16 @@ def documents() -> dict:
     with a classification line, so a deployment can keep them in git and a
     human can read them without a tool."""
     out = {}
-    d = ROOT / "documents"
+    d = DOCUMENTS
+    # Fail closed: a document with no classification line — or one that names
+    # a level this deployment does not have — is treated as the highest level.
+    # It used to default to "public", so forgetting one line published it.
+    top = CLEARANCE[-1] if CLEARANCE else "public"
     for p in sorted(d.glob("*.md")) if d.exists() else []:
         text = p.read_text(encoding="utf-8")
         m = re.search(r"^classification:\s*(\w+)", text, re.M)
-        out[p.stem] = {"classification": m.group(1) if m else "public",
+        level = m.group(1) if m and (not CLEARANCE or m.group(1) in CLEARANCE) else top
+        out[p.stem] = {"classification": level,
                        "title": p.stem.replace("-", " "),
                        "body": text}
     return out
