@@ -69,11 +69,11 @@ skills; a user agent cannot read a system skill at all.
 
 | Android | AINIX |
 |---|---|
-| Bootloader | UKI — kernel + initrd + cmdline in one blob |
+| Bootloader | systemd-boot on disk; kernel + squashfs initrd for RAM boot (UKI designed, not built) |
 | Linux kernel | Linux kernel, minimal config, AI-tuned parameters |
-| Vendor HAL | Accelerator profile — driver per vendor, exposed via CDI |
-| ART / Zygote | MAX + Mojo |
-| APK / app sandbox | Agent — OCI image, own uid, netns, cgroup |
+| Vendor HAL | Accelerator profile — one Nix module per vendor (NVIDIA, AMD evaluate; never booted) |
+| ART / Zygote | Mojo entrypoints; llama.cpp serves locally, MAX targets GPUs |
+| APK / app sandbox | Agent — own uid, cgroup quota, Unix sockets only (OCI + netns designed, not built) |
 | Manifest permissions | `agent.toml` — nothing undeclared is reachable |
 | Binder / ServiceManager | `agentd` — registry, discovery, capability broker |
 | AOSP build | Nix flake |

@@ -24,19 +24,28 @@ That copies `agents/_template/` into `agents/app/my-agent/`. Then:
 
 1. Edit `agent.toml` — declare `models`, `tools`, `peers`, `quota`, `card`.
 2. Write `main.mojo`.
-3. `make agent-check AGENT=app/my-agent` — validates the manifest against
-   `agents/schema/agent.schema.json` and checks every grant resolves.
-4. `make agent-run AGENT=app/my-agent` — runs it against the local runner.
+3. `make agent-check AGENT=app/my-agent` — `scripts/check_agent.py` checks the
+   manifest and that every grant resolves.
+4. Run it against a local broker: start `agents/system/agentd/agentd.py`, then
+   `python3 agents/lib/run_agent.py agents/app/my-agent` (or `mojo run
+   main.mojo` from its directory).
 
-There is no central registry file to edit. `nix/agent.nix` discovers every
-directory under `agents/{user,app,system}/` that contains an `agent.toml`.
+There is no central registry file to edit. `nix/services/agents.nix` discovers
+every directory under `agents/{user,app,system}/` that contains an
+`agent.toml` and generates its unit and its uid.
 
 ## The rules that are enforced, not just documented
 
-- A grant not in `agent.toml` **fails the build**, not the request.
-- At runtime the agent gets its own uid, netns and cgroup; only granted sockets
-  are mounted in. An ungranted model endpoint is unreachable, not merely denied.
-- `agentd` verifies a capability token on every call and writes an audit record.
+- An illegal grant **fails the build**: the Nix build of the image runs the
+  same validator as CI.
+- The agent registers by name; agentd reads its manifest from disk, and on the
+  image binds the name to the agent's own uid via `SO_PEERCRED`.
+- Each agent unit may open only Unix sockets, so it reaches models, peers,
+  documents and tools only through agentd — which checks the grant on every
+  request and writes an audit record with the reason.
+
+See [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for what is built and what
+is still only designed.
 
 ## Evolution
 

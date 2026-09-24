@@ -19,6 +19,11 @@ let
     cp    ${ainixSrc}/models.toml $out/models.toml
     ${lib.optionalString (builtins.pathExists (ainixSrc + "/groups.toml"))
       "cp ${ainixSrc}/groups.toml $out/groups.toml"}
+
+    # The same validator CI runs, as a build step: an image whose agent tree
+    # contains an illegal grant, an undeclared model, a user agent with
+    # clearance, or a skill its tier cannot see does not build at all.
+    ${pkgs.python3}/bin/python3 ${ainixSrc}/scripts/check_agent.py $out
   '';
 in
 {
