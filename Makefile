@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check
 
 image:
 ifeq ($(ENGINE),max)
@@ -160,4 +160,8 @@ test: lint agent-check policy
 	@$(MAKE) --no-print-directory example-check EXAMPLE=globex
 	@echo "\nmake test: all passed"
 
-test-full: test mojo-build os-eval smoke
+# Boots the real image and reads the verdict it prints about itself.
+boot-check:
+	./test/boot-check.sh
+
+test-full: test mojo-build os-eval smoke boot-check

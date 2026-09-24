@@ -851,3 +851,28 @@ it was found under. Two regression tests keep it shut.
   path per run.
 
 `test/agent-policy.sh`: 24 assertions, every denial checked for its reason.
+
+## The image tests itself — 2026-09-24
+
+Proving the agent plane worked on the image meant typing into a VM's login
+prompt with `sleep` between keystrokes — a script that lived in a scratch
+directory and nowhere in the repo. `nix/services/selftest.nix` runs only when
+the kernel command line carries `ainix.selftest`; it checks from inside, prints
+one verdict line to the console, and powers off. `make boot-check` builds,
+boots, and reads it:
+
+```
+  ok   agentd is active
+  ok   ainix-agent-app-shell-expert is active
+  ok   at least one agent unit exists
+  ok   console agent passes its probe
+  ok   a non-agent uid cannot act as an agent
+  ok   the refusal names the uid
+  PASS
+```
+
+The first version discovered agent units at runtime with `systemctl
+list-units 'ainix-agent-*'`, found none, **checked nothing, and printed PASS**.
+The expected units now come from the Nix configuration at evaluation time, and
+an empty list is itself a failure. A test that can pass by finding nothing to
+test is a test of the pattern it greps for.

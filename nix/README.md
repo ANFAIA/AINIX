@@ -4,6 +4,7 @@
 make os-eval     # type-check the whole configuration, build nothing
 make os-build    # build the qcow2 disk image  (needs KVM — see below)
 make os-boot     # boot the artefact in QEMU
+make boot-check  # boot it with ainix.selftest and read the verdict it prints
 ```
 
 Nix runs inside a `nixos/nix` container because the development machine is a
@@ -22,6 +23,7 @@ Mac. A named volume keeps the store between runs, so the second build is fast.
 | `services/firstboot.nix` | the network-then-model question, before the login prompt |
 | `services/agentd.nix` | the broker, started before any agent; `AINIX_IDENTITY=uid` |
 | `services/agents.nix` | one unit and one uid per agent, generated from the tree |
+| `services/selftest.nix` | with `ainix.selftest` on the kernel command line, the image checks itself and powers off |
 
 ## Two artefacts, one configuration
 
