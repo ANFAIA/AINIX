@@ -56,6 +56,13 @@ RUNNER = os.environ.get("AINIX_RUNNER", "http://127.0.0.1:8000")
 #        registration says so in the audit log.
 IDENTITY = os.environ.get("AINIX_IDENTITY", "name")
 
+# Ceilings on what a caller may ask for. A grant to a model is a grant to use
+# it, not to monopolise it: one agent asking for a million tokens, or parking a
+# task for a day, holds the shared runner and the broker for everyone else.
+MAX_TOKENS = int(os.environ.get("AINIX_MAX_TOKENS", "4096"))
+MAX_TASK_SECONDS = float(os.environ.get("AINIX_MAX_TASK_SECONDS", "900"))
+MAX_LINE = 1 << 20          # one request, one line, at most 1 MiB
+
 # Top (least privileged) to bottom. A tier sees its own level and every level
 # above it — the same ordering scripts/skillctl.py enforces.
 LEVELS = ["user", "app", "system"]
@@ -272,10 +279,22 @@ def documents() -> dict:
     return out
 
 
+NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+
+
 def find_skill(name: str) -> tuple[str, Path] | tuple[None, None]:
+    """Locate a skill by name, at whichever level holds it.
+
+    The name is validated before it touches a path. It used to be pasted into
+    one as-is, so a user agent asking for "../system/recover" was found under
+    skills/user/ — the level rule said allow, and the audit log recorded
+    "user sees user" for a read of a protected system skill."""
+    if not NAME.fullmatch(name or ""):
+        return None, None
+    base = (ROOT / "skills").resolve()
     for lvl in LEVELS:
-        p = ROOT / "skills" / lvl / name / "SKILL.md"
-        if p.exists():
+        p = (ROOT / "skills" / lvl / name / "SKILL.md").resolve()
+        if p.is_file() and p.is_relative_to(base / lvl):
             return lvl, p
     return None, None
 
@@ -320,13 +339,24 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     uid = peer_uid(writer.get_extra_info("socket"))
     try:
         while True:
-            line = await reader.readline()
+            try:
+                line = await reader.readline()
+            except ValueError:
+                # Longer than MAX_LINE: refuse and close rather than buffer it.
+                await send(writer, ok=False, error=f"request exceeds {MAX_LINE} bytes")
+                break
             if not line:
                 break
             try:
                 msg = json.loads(line)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 await send(writer, ok=False, error="malformed JSON")
+                continue
+            # Every request is an object. A bare list or string used to reach
+            # the error handler, whose own audit line called msg.get() and
+            # dropped the connection without a reply.
+            if not isinstance(msg, dict):
+                await send(writer, ok=False, error="a request is a JSON object")
                 continue
             try:
                 me = await dispatch(msg, me, writer, uid, reader)
@@ -424,7 +454,8 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
         else:
             content = await asyncio.to_thread(
                 infer, msg["model"], msg["messages"],
-                msg.get("thinking", False), msg.get("max_tokens", 512))
+                msg.get("thinking", False),
+                max(1, min(int(msg.get("max_tokens", 512)), MAX_TOKENS)))
             await send(w, ok=True, content=content)
 
     elif op == "task":
@@ -441,7 +472,8 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
                 {"id": tid, "from": me, "skill": msg.get("skill", ""),
                  "input": msg.get("input")})
             try:
-                out = await asyncio.wait_for(fut, timeout=msg.get("timeout", 300))
+                limit = max(1.0, min(float(msg.get("timeout", 300)), MAX_TASK_SECONDS))
+                out = await asyncio.wait_for(fut, timeout=limit)
                 await send(w, ok=True, output=out)
             except asyncio.TimeoutError:
                 REG.pending.pop(tid, None)
@@ -545,7 +577,7 @@ async def main() -> int:
     if path.exists():
         path.unlink()
     load_groups()
-    server = await asyncio.start_unix_server(handle, str(path))
+    server = await asyncio.start_unix_server(handle, str(path), limit=MAX_LINE)
     os.chmod(path, 0o660)
     print(f"agentd listening on {path} | runner {RUNNER} | identity {IDENTITY}"
           + (f" | clearance {'<'.join(CLEARANCE)}" if CLEARANCE else ""),

@@ -8,7 +8,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-export AINIX_SOCK=${AINIX_SOCK:-${TMPDIR:-/tmp}/ainix-clearance.sock}
+export AINIX_SOCK=${TMPDIR:-/tmp}/ainix-clearance-$$.sock
 export AINIX_ROOT=$PWD/examples/acme
 export PYTHONPATH=$PWD/agents/lib
 PY=${PY:-python3}
@@ -16,7 +16,13 @@ PY=${PY:-python3}
 $PY agents/system/agentd/agentd.py 2>"${TMPDIR:-/tmp}/agentd-clearance.log" &
 AGENTD=$!
 trap 'kill $AGENTD 2>/dev/null; rm -f "$AINIX_SOCK"' EXIT
-for _ in $(seq 50); do [ -S "$AINIX_SOCK" ] && break; sleep 0.1; done
+# Ready means accepting connections. A socket FILE can be left over from a
+# killed run, and testing for it (-S) raced the broker's startup.
+for _ in $(seq 100); do
+  $PY -c "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])" \
+    "$AINIX_SOCK" 2>/dev/null && break
+  sleep 0.1
+done
 
 pass=0; fail=0
 check() { # check <name> <expected> <python expression printing a result>

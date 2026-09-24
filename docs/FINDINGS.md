@@ -815,3 +815,39 @@ runner, not by whether it loads.
 - **`zip()` truncated silently** in the evaluator: a sandbox that returned fewer
   verdicts than commands produced a lower score, not an error. The zips are
   strict and the sandbox checks its own count.
+
+## A second way past the skill levels — 2026-09-24
+
+After identity moved to disk, the skill rule still had a hole. `find_skill`
+pasted the requested name into a path, so a user agent asking for
+`../system/recover` was resolved under `skills/user/` — the level check saw
+"user" and allowed it:
+
+```
+[audit] ALLOW user/shell skill user/../system/recover — user sees user
+```
+
+A protected system skill, read by the least-privileged tier, **and the audit log
+recorded it as a permitted same-level read.** An audit trail that describes the
+path the attacker typed rather than the file they got is worse than none.
+
+Skill names are now validated against the same pattern as agent names before
+they touch a path, and the resolved file must sit inside the level directory
+it was found under. Two regression tests keep it shut.
+
+### And the rest of the broker's input surface
+
+- `max_tokens` and task `timeout` came from the caller unbounded — a grant to
+  use a model became a grant to monopolise the shared runner. Both are capped
+  (`AINIX_MAX_TOKENS`, `AINIX_MAX_TASK_SECONDS`).
+- a request over 1 MiB is refused and the connection closed, rather than
+  buffered.
+- a JSON list or string reached the error handler, whose own audit line called
+  `msg.get()` and dropped the connection without a reply. Non-objects are now
+  refused with a reply and the connection stays usable.
+- the policy tests waited for the socket *file* to exist. A file left by a
+  killed run satisfied that instantly and the first checks raced the broker's
+  startup. They now wait until the socket accepts a connection, on a private
+  path per run.
+
+`test/agent-policy.sh`: 24 assertions, every denial checked for its reason.

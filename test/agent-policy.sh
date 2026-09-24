@@ -8,7 +8,7 @@ set -u
 cd "$(dirname "$0")/.."
 
 TMP=${TMPDIR:-/tmp}
-export AINIX_SOCK=${AINIX_SOCK:-$TMP/ainix-test-agentd.sock}
+export AINIX_SOCK=$TMP/ainix-policy-$$.sock
 export AINIX_ROOT=$PWD
 export PYTHONPATH=$PWD/agents/lib
 PY=${PY:-python3}
@@ -17,7 +17,13 @@ $PY agents/system/agentd/agentd.py 2>"$TMP/agentd-policy.log" &
 AGENTD=$!
 STUB=
 trap 'kill $AGENTD $STUB 2>/dev/null; rm -f "$AINIX_SOCK"' EXIT
-for _ in $(seq 50); do [ -S "$AINIX_SOCK" ] && break; sleep 0.1; done
+# Ready means accepting connections. A socket FILE can be left over from a
+# killed run, and testing for it (-S) raced the broker's startup.
+for _ in $(seq 100); do
+  $PY -c "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])" \
+    "$AINIX_SOCK" 2>/dev/null && break
+  sleep 0.1
+done
 
 pass=0; fail=0
 check() { # check <name> <allow|deny> <python statement> [substring the denial must contain]
@@ -71,6 +77,17 @@ check "one connection cannot register twice"       deny \
   "already registered as user/shell"
 
 echo
+echo "hostile input — refused with a reply, and the connection survives"
+check "a JSON list is not a request"              deny \
+  "c=Conn(); import json; c.f.write(b'[1,2]\\n'); c.f.flush(); r=json.loads(c.f.readline()); raise Denied(r['error'])" \
+  "a request is a JSON object"
+check "bytes that are not UTF-8"                  deny \
+  "c=Conn(); import json; c.f.write(b'\\xff\\xfe\\n'); c.f.flush(); r=json.loads(c.f.readline()); raise Denied(r['error'])" \
+  "malformed JSON"
+check "the connection is usable afterwards"       allow \
+  "c=Conn(); import json; c.f.write(b'[]\\n'); c.f.flush(); c.f.readline(); c.call('register', name='user/shell')"
+
+echo
 echo "capabilities"
 check "user agent may not use a model"             deny \
   "load('$SHELL_M')._conn.call('infer', model='gemma-3-1b', messages=[])" \
@@ -79,6 +96,10 @@ check "user agent may not read a system skill"     deny \
   "load('$SHELL_M')._conn.call('skill', name='manage-runner')" "system is below user"
 check "user agent reads its own level"             allow \
   "load('$SHELL_M')._conn.call('skill', name='explain-error')"
+check "a skill name cannot climb out of its level" deny \
+  "load('$SHELL_M')._conn.call('skill', name='../system/recover')" "no such skill"
+check "nor reach a protected skill by another path" deny \
+  "load('$SHELL_M')._conn.call('skill', name='user/../system/manage-runner')" "no such skill"
 check "app agent reads a user-level skill"         allow \
   "load('$EXPERT_M')._conn.call('skill', name='explain-error')"
 check "app agent may not read a system skill"      deny \
