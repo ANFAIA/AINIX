@@ -21,6 +21,7 @@ endif
 	@docker image inspect $(IMAGE) --format 'image size: {{.Size}} bytes'
 
 run:
+	@scripts/port-free.sh $(PORT) $(NAME)
 	mkdir -p $(HF_CACHE) $(MAX_CACHE) $(WEIGHTS)
 	docker rm -f $(NAME) 2>/dev/null || true
 ifeq ($(ENGINE),max)
@@ -33,7 +34,7 @@ ifeq ($(ENGINE),max)
 else
 	docker run -d --name $(NAME) -p $(PORT):8000 \
 	  -v $(WEIGHTS):/weights:ro \
-	  -e AINIX_MODEL_FILE=/weights/$(GGUF) \
+	  -e LLAMA_ARG_MODEL=/weights/$(GGUF) \
 	  $(IMAGE)
 	@echo "serving $(GGUF) on :$(PORT)"
 endif

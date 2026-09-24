@@ -671,3 +671,53 @@ The script is packaged now and the unit passes `AINIX_FETCH`.
 real machine and impossible for an automated boot check — the check answered
 its model prompt by accident and set off a download. It is now behind
 `ainix.firstboot.enable`, off in the test image only.
+
+## The runner image was never 96 MB — now it is — 2026-09-24
+
+README, agents_install.md and this file all said the llama.cpp runner was a
+96 MB image. `docker image inspect` says 1,174,031,118 bytes, and the
+Dockerfile had not changed since the first commit: it was always ~1.17 GB. The
+claim was wrong from the start.
+
+Of those 1.17 GB, the server uses 27 MB (`/app`) plus libc, libstdc++, libgomp
+and libssl. The other ~620 MB is Ubuntu's `/usr/lib`. For a distribution whose
+premise is keeping the minimum, that is the wrong thing to ship next to a model.
+
+`runtime/Dockerfile.llamacpp` is now a two-stage build: the engine from the
+upstream image, copied onto `gcr.io/distroless/cc-debian13`. **96,215,505
+bytes**, no shell, no package manager, and it serves — `make smoke` passes.
+
+Two things it took to get there:
+
+- **distroless debian12 fails**: `GLIBC_2.38 not found (required by
+  /app/libllama.so.0)`. The engine is built against a newer glibc; debian13
+  carries it.
+- **the `server` tag floats.** It moved from b10615 to b11151 between two runs
+  of this repo without anyone choosing that. The build pins `server-b11151`; a
+  runner whose engine changes under it cannot be benchmarked against itself.
+
+With no shell there is no entry script: llama-server reads `LLAMA_ARG_*` from
+the environment directly, so `make run` passes `LLAMA_ARG_MODEL`.
+
+### Throughput could not be re-measured today
+
+`make bench` gave 10.8 tok/s against the 101.6 recorded earlier. The machine's
+load average was 11.5 on 10 cores — esbuild, a Docker VM, and a separate
+llama-server holding 3 GB were all running. That number measures contention,
+not the runner, and is not a regression claim either way.
+
+## A port someone else holds looked like a healthy runner
+
+`make smoke` failed with `curl: (22) ... 405`. Something on :8000 answered
+`/health` with 200 — an unrelated uvicorn app, 14 days old — so the health gate
+passed and the real request died with an error pointing nowhere near the cause.
+And because Docker publishes on 0.0.0.0, `make run` would have *succeeded*
+while the other app kept 127.0.0.1:8000: every request to localhost would reach
+it, not the runner.
+
+- `scripts/port-free.sh` runs before `make run` and refuses a port held by
+  anything but our container, naming the holder and suggesting a port that is
+  actually free.
+- `test/smoke.sh` checks the answering server lists a GGUF before trusting it,
+  and its PASS line now names the model that answered — a second llama.cpp on
+  the same port would otherwise pass for ours.

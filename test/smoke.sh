@@ -20,6 +20,29 @@ if ! health && ! docker ps --filter "name=${NAME}" --filter status=running -q | 
   exit 1
 fi
 
+# Something answering /health is not proof it is ours. llama.cpp lists the GGUF
+# it has loaded; an unrelated app on the same port does not. Without this, a
+# foreign server passes the health gate and the test fails later with a 405
+# that points nowhere near the cause.
+is_runner() {
+  curl -fsS "${BASE}/v1/models" 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+names = [m.get("name") or m.get("id") or "" for m in d.get("models", []) + d.get("data", [])]
+owned = [m.get("owned_by", "") for m in d.get("data", [])]
+sys.exit(0 if any(n.endswith(".gguf") for n in names) or "llamacpp" in owned else 1)'
+}
+
+if health && ! is_runner; then
+  echo "FAIL: something is answering on ${BASE}, but it is not an AINIX runner." >&2
+  lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print "      held by "$1" (pid "$2")"}' | sort -u >&2 || true
+  echo "      run the runner on another port:  make run PORT=8090 && make smoke PORT=8090" >&2
+  exit 1
+fi
+
 echo "waiting for ${BASE} (up to ${TIMEOUT}s)"
 deadline=$(( $(date +%s) + TIMEOUT ))
 until health; do
@@ -51,5 +74,9 @@ if [ "$content" = "" ]; then
   exit 1
 fi
 
-echo "PASS ($((t1-t0))s)"
+# Name what answered. Any llama.cpp server passes the identity check above, so
+# a PASS that does not say which model it tested can be a PASS against someone
+# else's server on the same port.
+served=$(printf '%s' "$resp" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("model","?"))' 2>/dev/null || echo "?")
+echo "PASS ($((t1-t0))s) — served by ${served##*/}"
 printf '%s\n' "$content"

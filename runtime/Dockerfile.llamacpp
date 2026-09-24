@@ -1,21 +1,38 @@
-# Fallback model runner: llama.cpp behind the same contract as the MAX runner.
+# The model runner: llama.cpp's server and nothing else, on a distroless base.
 #
-# Why this exists: MAX 26.5's CPU backend cannot serve on aarch64 — see
-# docs/FINDINGS.md. Gemma declares only bfloat16 (unsupported on CPU), and the
-# q4_k path crashes the Mojo backend during codegen. Rather than block the whole
-# POC on that, the runner interface stays identical — OpenAI-compatible API on
-# :8000, same env vars, same volumes — and only the engine swaps.
+# Why llama.cpp and not MAX locally: MAX does not run a model on macOS — see
+# docs/FINDINGS.md. The runner contract (an OpenAI-compatible API on :8000) is
+# engine-independent, so this is a swap of one Dockerfile, not of the design.
 #
-# On GPU hardware, use runtime/Dockerfile (MAX). This image is the CPU stand-in.
+# Why distroless: the upstream image is ~1.17 GB, of which the server uses 27 MB
+# (/app) plus libc, libstdc++, libgomp and libssl. A distribution whose premise
+# is "keep the minimum" should not ship 620 MB of unused system libraries next
+# to its model. This is 96 MB. No shell, no package manager — nothing in the
+# image that the server does not execute.
+#
+# Why debian13: the engine is built against glibc 2.38+; distroless debian12
+# ships 2.36 and the server refuses to load.
+#
+# Why pinned: the `server` tag floats. It moved from b10615 to b11151 between two
+# runs of this repo without anyone deciding it should. A runner whose engine
+# changes under it cannot be benchmarked against itself.
 
-FROM ghcr.io/ggml-org/llama.cpp:server
+ARG LLAMA_CPP=server-b11151
 
-ENV AINIX_MODEL_FILE=/weights/model.gguf \
-    AINIX_CTX=4096 \
-    AINIX_PORT=8000 \
-    AINIX_THREADS=8
+FROM ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP} AS engine
 
-COPY runtime/entry-llamacpp.sh /usr/local/bin/entry.sh
+FROM gcr.io/distroless/cc-debian13
+COPY --from=engine /app /app
+
+# llama-server reads its flags from LLAMA_ARG_* directly, which is what lets
+# this image have no shell and no entry script. Override any of them with -e.
+ENV LD_LIBRARY_PATH=/app \
+    LLAMA_ARG_MODEL=/weights/model.gguf \
+    LLAMA_ARG_HOST=0.0.0.0 \
+    LLAMA_ARG_PORT=8000 \
+    LLAMA_ARG_CTX_SIZE=4096 \
+    LLAMA_ARG_THREADS=8 \
+    LLAMA_ARG_JINJA=1
 
 EXPOSE 8000
-ENTRYPOINT ["/usr/local/bin/entry.sh"]
+ENTRYPOINT ["/app/llama-server"]
