@@ -721,3 +721,41 @@ it, not the runner.
 - `test/smoke.sh` checks the answering server lists a GGUF before trusting it,
   and its PASS line now names the model that answered — a second llama.cpp on
   the same port would otherwise pass for ours.
+
+## Every agent is its own uid, and the kernel says who is calling — 2026-09-24
+
+`nix/services/agents.nix` generates a systemd unit and a system user for every
+agent in the tree — nobody writes them by hand. agentd on the image runs with
+`AINIX_IDENTITY=uid` and accepts a name only from the uid of
+`ainix-<tier>-<name>`, read with `SO_PEERCRED`. Verified in a booted VM:
+
+```
+[audit] ALLOW app/shell-expert register app/shell-expert — tier=app identity=uid
+[audit] DENY  user/shell register user/shell — peer uid 1000 is not ainix-user-shell
+[audit] ALLOW user/shell register user/shell — tier=user identity=uid
+PROBE 5/5
+```
+
+The second line is the point: the human login user, a member of the broker's
+group and able to open its socket, tried to act as the console agent and was
+refused on the kernel's word, not on anything it said about itself.
+
+Each agent unit enforces its manifest's quota (`MemoryMax`, `CPUQuota`) and
+`RestrictAddressFamilies = AF_UNIX` with `IPAddressDeny = any`: an agent opens
+no network socket of its own. Models, peers, documents and tools all go through
+the broker, so the broker's audit log is a complete record of what an agent
+did — not a record of what it chose to route through it.
+
+The `ainix` console runs as `ainix-user-shell` via sudo. A person operating it
+borrows the console's identity and grants — deliberately the smallest on the
+machine — never their own.
+
+### The image runs agents in Python, not Mojo
+
+Every agent's entrypoint is a `main.mojo`, and all 31 compile. The image runs
+them through `agents/lib/run_agent.py` instead, because the Mojo toolchain is
+not in nixpkgs and cannot be fetched from PyPI inside a Nix build sandbox. The
+behaviour is identical — `handle()` is the library default either way, and an
+agent that needs its own ships `handler.py` beside its manifest — but it is not
+Mojo-first on the image, and it should be. Packaging the `modular` wheel as a
+fixed-output derivation with autoPatchelf is the way through.

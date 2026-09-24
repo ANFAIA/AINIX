@@ -50,6 +50,9 @@ in
         AINIX_SOCK = cfg.socket;
         AINIX_ROOT = "${cfg.root}";
         AINIX_RUNNER = "http://127.0.0.1:${toString config.ainix.runner.port}";
+        # Every agent on the image runs as its own ainix-<tier>-<name> user
+        # (nix/services/agents.nix), so a name is accepted only from that uid.
+        AINIX_IDENTITY = "uid";
         PYTHONPATH = "${cfg.root}/agents/lib";
         # systemd services get no LANG, so Python falls back to ASCII and the
         # first SKILL.md with an em dash kills the read. The code says utf-8
@@ -112,7 +115,13 @@ in
 
     environment.systemPackages = [
       (pkgs.writeShellScriptBin "ainix" ''
-        # The console, for a human at the machine.
+        # The console, for a human at the machine. It runs as the user/shell
+        # agent's own uid: agentd binds names to uids, so a human operating the
+        # console borrows the console's identity — and its grants, which are
+        # deliberately the smallest on the machine — never their own.
+        if [ "$(id -un)" != "ainix-user-shell" ]; then
+          exec /run/wrappers/bin/sudo -u ainix-user-shell --preserve-env=TERM "$0" "$@"
+        fi
         export AINIX_SOCK=${cfg.socket}
         export AINIX_ROOT=${cfg.root}
         export PYTHONPATH=${cfg.root}/agents/lib

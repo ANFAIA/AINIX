@@ -20,6 +20,8 @@ Mac. A named volume keeps the store between runs, so the second build is fast.
 | `profiles/*.nix` | the HAL: one file per accelerator vendor |
 | `services/runner.nix` | the shared model runner on :8000 |
 | `services/firstboot.nix` | the network-then-model question, before the login prompt |
+| `services/agentd.nix` | the broker, started before any agent; `AINIX_IDENTITY=uid` |
+| `services/agents.nix` | one unit and one uid per agent, generated from the tree |
 
 ## Two artefacts, one configuration
 
