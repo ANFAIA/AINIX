@@ -103,7 +103,46 @@ def sandbox(cmds: list[str]) -> list[bool]:
          "touch deploy.sh notes/meeting.txt /var/log/syslog file.txt && "
          "cat > /tmp/s.sh && sh /tmp/s.sh"],
         input=script, capture_output=True, text=True, timeout=600)
-    return [l == "OK" for l in p.stdout.strip().splitlines()]
+    got = [line == "OK" for line in p.stdout.strip().splitlines()]
+    # One verdict per command, or the run is void. A container that died
+    # half-way used to yield a shorter list, and zip() quietly dropped the
+    # unscored tail — the report then read as a lower score, not an error.
+    if len(got) != len(cmds):
+        raise RuntimeError(f"sandbox returned {len(got)} verdicts for "
+                           f"{len(cmds)} commands; stderr: {p.stderr[-300:]}")
+    return got
+
+
+def mlx_outputs(model_id: str, adapter, rows, max_tokens) -> list[str]:
+    from mlx_lm import load, generate
+    model, tok = load(model_id, adapter_path=adapter)
+    outs = []
+    for r in rows:
+        msgs = [{"role": "system", "content": SYSTEM},
+                {"role": "user", "content": r["nl"]}]
+        prompt = tok.apply_chat_template(msgs, add_generation_prompt=True,
+                                         enable_thinking=False)
+        outs.append(generate(model, tok, prompt=prompt, max_tokens=max_tokens,
+                             verbose=False))
+    return outs
+
+
+def served(url: str, rows, max_tokens) -> list[str]:
+    """Greedy, thinking off — the same conditions the MLX path generates under,
+    so a difference in score is the export's, not the sampler's."""
+    import urllib.request
+    outs = []
+    for r in rows:
+        body = {"messages": [{"role": "system", "content": SYSTEM},
+                             {"role": "user", "content": r["nl"]}],
+                "max_tokens": max_tokens, "temperature": 0,
+                "chat_template_kwargs": {"enable_thinking": False}}
+        req = urllib.request.Request(url.rstrip("/") + "/v1/chat/completions",
+                                     json.dumps(body).encode(),
+                                     {"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            outs.append(json.load(resp)["choices"][0]["message"]["content"] or "")
+    return outs
 
 
 def base_util(cmd: str) -> str:
@@ -118,10 +157,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="Qwen/Qwen3.5-0.8B")
     ap.add_argument("--adapter", default="models/AINIX_NEO_terminal-lora")
-    ap.add_argument("--eval", default="/tmp/nl2bash_test.csv")
+    ap.add_argument("--eval", default="training/data/nl2bash_test.csv")
     ap.add_argument("--limit", type=int, default=60)
     ap.add_argument("--max-tokens", type=int, default=120)
     ap.add_argument("--out", default="docs/eval.json")
+    ap.add_argument("--endpoint", nargs=2, action="append", metavar=("LABEL", "URL"),
+                    help="score a SERVED model instead of an MLX adapter, e.g. "
+                         "--endpoint tuned-gguf http://localhost:8094. Repeatable. "
+                         "This is how an export is checked: the same prompts, the "
+                         "same reward, through the runner that will actually serve it.")
     ap.add_argument("--trained-on", nargs="*", default=[
         "training/data/AINIX_NEO_terminal.jsonl",
         "training/data/AINIX_NEO_v2.jsonl",
@@ -129,40 +173,37 @@ def main() -> int:
         "training/data/distilled2.jsonl"],
         help="every file the adapter may have seen; all are excluded")
     args = ap.parse_args()
-
-    from mlx_lm import load, generate
+    if not (ROOT / args.eval).exists() and \
+            args.eval.endswith("nl2bash_test.csv"):
+        from reward import nl2bash
+        nl2bash("test")
 
     seen = training_prompts(args.trained_on)
-    rows = load_eval(Path(args.eval), seen, args.limit)
+    rows = load_eval(ROOT / args.eval, seen, args.limit)
     print(f"{len(rows)} held-out prompts (NL2Bash test, "
           f"{len(seen)} training prompts excluded)\n")
 
     report = {}
-    for label, adapter in [("base", None), ("tuned", args.adapter)]:
-        model, tok = load(args.model, adapter_path=adapter)
-        outs = []
-        for r in rows:
-            msgs = [{"role": "system", "content": SYSTEM},
-                    {"role": "user", "content": r["nl"]}]
-            prompt = tok.apply_chat_template(msgs, add_generation_prompt=True,
-                                             enable_thinking=False)
-            outs.append(generate(model, tok, prompt=prompt,
-                                 max_tokens=args.max_tokens, verbose=False))
+    runs = ([(label, url) for label, url in args.endpoint] if args.endpoint
+            else [("base", None), ("tuned", args.adapter)])
+    for label, target in runs:
+        outs = (served(target, rows, args.max_tokens) if args.endpoint
+                else mlx_outputs(args.model, target, rows, args.max_tokens))
 
         parsed = [extract(o) for o in outs]
         cmds = [c or "false" for c, _ in parsed]
         ran = sandbox(cmds)
         from reward import score
-        graded = [score(c, r["ref"]) for c, r in zip(cmds, rows)]
+        graded = [score(c, r["ref"]) for c, r in zip(cmds, rows, strict=True)]
 
         n = len(rows)
         stats = {
             "answers": sum(c is not None and not REFUSAL.search(o)
-                           for (c, _), o in zip(parsed, outs)),
+                           for (c, _), o in zip(parsed, outs, strict=True)),
             "contract": sum(u for _, u in parsed),
             "runs": sum(ran),
             "matches": sum(bool(c) and base_util(c) == base_util(r["ref"])
-                           for (c, _), r in zip(parsed, rows)),
+                           for (c, _), r in zip(parsed, rows, strict=True)),
             "correct": sum(g["reward"] == 1.0 for g in graded),
             "plausible": sum(g["reward"] == 0.6 for g in graded),
             "n": n,
@@ -173,7 +214,7 @@ def main() -> int:
                          "contract": u, "ran": ok, "verdict": g["verdict"],
                          "why": g["why"]}
                         for r, (c, u), ok, g in
-                        zip(rows, parsed, ran, graded)][:20],
+                        zip(rows, parsed, ran, graded, strict=True)][:20],
         }
         print(f"  {label:6} answers {stats['answers']:2}/{n}  "
               f"contract {stats['contract']:2}/{n}  "

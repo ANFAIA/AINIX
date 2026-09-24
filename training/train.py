@@ -18,7 +18,7 @@ import argparse
 
 import torch
 from datasets import load_dataset
-from unsloth import FastModel, is_bfloat16_supported
+from unsloth import FastModel
 from unsloth.chat_templates import get_chat_template, train_on_responses_only
 from trl import SFTConfig, SFTTrainer
 

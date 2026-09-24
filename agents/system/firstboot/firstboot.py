@@ -263,7 +263,7 @@ def run() -> int:
         print(f"\n  Downloading {chosen} ({model.get('size','')})…\n")
         rc = subprocess.run([str(FETCH), chosen], cwd=ROOT).returncode
         if rc != 0:
-            print(f"\n  Download failed. Fix the network and run `ainix-firstboot` again.")
+            print("\n  Download failed. Fix the network and run `ainix-firstboot` again.")
             return rc
 
     write_state(chosen, online)

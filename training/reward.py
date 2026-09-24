@@ -22,8 +22,6 @@ outranks a 0.0 still carries signal.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import subprocess
 
 IMAGE = "debian:stable-slim"
@@ -161,6 +159,21 @@ echo "FS:$(find /testbed /srv /var/log /tmp/work ~/Documents notes file.txt \
                 continue
         for n, cmd in enumerate(chunk):
             _CACHE[cmd] = by_index.get(n, "RC:124\nOUT:timeout\nFS:timeout\n")
+
+
+def nl2bash(split: str) -> "Path":
+    """The NL2Bash split, fetched once into training/data/. It used to live in
+    /tmp, which the OS empties — and an evaluation whose benchmark can vanish
+    between runs is not reproducible. `split` is "train" or "test"."""
+    from pathlib import Path
+    import urllib.request
+    dest = Path(__file__).resolve().parent / "data" / f"nl2bash_{split}.csv"
+    if not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        url = ("https://huggingface.co/datasets/dilkushsingh/NL2Bash/resolve/"
+               f"main/NL2bash_{split}.csv")
+        urllib.request.urlretrieve(url, dest)
+    return dest
 
 
 def score_many(pairs: list[tuple[str, str | None]]) -> list[dict]:

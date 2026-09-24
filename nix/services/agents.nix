@@ -8,7 +8,7 @@
 #
 # User-tier agents get a user but no service — they are surfaces a human opens
 # (`ainix`), not daemons.
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, ainixSrc, ... }:
 
 let
   cfg = config.ainix.agentd;
@@ -17,8 +17,15 @@ let
   # The broker and first boot have units of their own.
   special = [ "system/agentd" "system/firstboot" ];
 
+  # Manifests are read from the SOURCE tree, never from the built plane. Reading
+  # a derivation's output at evaluation time is import-from-derivation: it
+  # forces a build of the plane for the target system just to evaluate, so an
+  # arm64 host could no longer even type-check the x86_64 — or NVIDIA, or AMD —
+  # configurations. Units still point at the plane for what they execute.
+  src = ainixSrc;
+
   tierDirs = tier:
-    let dir = plane + "/agents/${tier}"; in
+    let dir = src + "/agents/${tier}"; in
     if builtins.pathExists dir then
       lib.filter (n: builtins.pathExists (dir + "/${n}/agent.toml"))
         (builtins.attrNames (lib.filterAttrs (_: t: t == "directory")
@@ -31,7 +38,7 @@ let
       id = "${tier}/${name}";
       unix = "ainix-${tier}-${name}";
       manifest = builtins.fromTOML
-        (builtins.readFile (plane + "/agents/${tier}/${name}/agent.toml"));
+        (builtins.readFile (src + "/agents/${tier}/${name}/agent.toml"));
     }) (tierDirs tier)) [ "user" "app" "system" ];
 
   daemons = lib.filter (a: a.tier != "user" && !(lib.elem a.id special)) agents;

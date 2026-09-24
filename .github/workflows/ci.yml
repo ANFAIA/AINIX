@@ -1,0 +1,48 @@
+# What runs on every push. The same targets a person or an agent runs locally —
+# CI is not a second, subtly different definition of "passing".
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # Lint, manifests, both halves of the capability system, and the worked
+    # examples. Needs nothing but Python — no Docker, no model, no network.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: make test
+
+  mojo:
+    # Every .mojo file must compile. Four entrypoints once sat in syntax Mojo
+    # had already removed, because nothing ever built them.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install modular
+      - run: make mojo-build MOJO=$(command -v mojo)
+
+  nixos:
+    # The whole distribution type-checks: kernel, tuning, profiles, broker,
+    # generated agent units. Evaluation only — building an image needs KVM.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - run: |
+          for cfg in ainix-cpu-x86_64 ainix-cpu-aarch64 ainix-nvidia ainix-amd; do
+            echo "== $cfg"
+            nix eval --raw ".#nixosConfigurations.$cfg.config.system.build.toplevel.drvPath"
+            echo
+          done

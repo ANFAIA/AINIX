@@ -29,11 +29,25 @@ cost a run.
    answers with token soup. A partial export that loads silently is more
    dangerous than one that fails loudly.
 
-## Known broken
+## Exporting for the runner
 
-`save_pretrained_gguf` fails for Qwen3.5 (`unsloth_convert_hf_to_gguf.py`
-returns 1). The adapter runs under MLX; the llama.cpp path does not work yet,
-so the runner cannot serve a freshly tuned model.
+```
+training/.venv313/bin/python training/export_gguf.py models/<name>-lora --install
+```
+
+Merges the LoRA into the **HuggingFace** base tensors directly, converts and
+quantizes with the same llama.cpp build the runner uses, then serves the result
+and refuses to install it unless it answers readably.
+
+Do not use `mlx_lm fuse` + convert, and do not use unsloth's
+`save_pretrained_gguf`. MLX saves conv1d weights channel-last, the converter
+reads them as PyTorch layout, and every Qwen3.5 linear-attention layer comes out
+transposed: the GGUF loads without an error and emits token soup. The fuse also
+drops the MTP block and rewrites the tokenizer class.
+
+Then measure the export, not just the adapter — same prompts, through the
+runner: `evaluate.py --endpoint tuned http://localhost:<port>`. v2 scored 20/60
+under MLX and 17/60 as Q4_K_M; the gap is quantization.
 
 ## When not to
 

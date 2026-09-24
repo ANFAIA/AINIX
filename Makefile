@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full
 
 image:
 ifeq ($(ENGINE),max)
@@ -131,3 +131,33 @@ policy:
 	./test/agent-policy.sh
 	@echo
 	./test/clearance-policy.sh
+
+# ---- the whole suite ------------------------------------------------------
+#
+# `make test` needs nothing but python3: no Docker, no network, no model. It is
+# what CI runs on every push. `make test-full` adds the checks that need Docker
+# (a live runner, the NixOS evaluation) and the Mojo toolchain.
+
+MOJO ?= $(shell command -v mojo 2>/dev/null || echo .venv-mojo/bin/mojo)
+
+lint:
+	@if command -v ruff >/dev/null 2>&1; then R=ruff; \
+	 elif command -v uvx >/dev/null 2>&1; then R="uvx ruff"; \
+	 else echo "lint: ruff not found (pip install ruff, or install uv)"; exit 1; fi; \
+	 $$R check --select F,E9,B --exclude '.venv*,training/.venv*,build' .
+
+# Every .mojo file in the repo must compile. Four agent entrypoints once sat in
+# obsolete syntax for weeks because nothing ever built them.
+mojo-build:
+	@test -x "$(MOJO)" || { echo "mojo-build: no Mojo toolchain (pip install modular)"; exit 1; }
+	@fail=0; for f in $$(find agents examples training scripts -name '*.mojo' | sort); do \
+	   if $(MOJO) build "$$f" -o /tmp/ainix-mojo-check.bin >/tmp/ainix-mojo.log 2>&1; then :; \
+	   else echo "FAIL $$f"; grep error: /tmp/ainix-mojo.log | head -3; fail=1; fi; \
+	 done; test $$fail = 0 && echo "all .mojo files compile"
+
+test: lint agent-check policy
+	@$(MAKE) --no-print-directory example-check EXAMPLE=acme
+	@$(MAKE) --no-print-directory example-check EXAMPLE=globex
+	@echo "\nmake test: all passed"
+
+test-full: test mojo-build os-eval smoke

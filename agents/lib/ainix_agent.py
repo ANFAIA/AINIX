@@ -14,9 +14,7 @@ from __future__ import annotations
 import json
 import os
 import socket
-import sys
 import tomllib
-from pathlib import Path
 
 SOCK = os.environ.get("AINIX_SOCK", "/run/ainix/agentd.sock")
 

@@ -136,8 +136,8 @@ def propose(teachers: dict, row: dict, want: int) -> list[dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--train", default="/tmp/nl2bash_train.csv")
-    ap.add_argument("--test", default="/tmp/nl2bash_test.csv")
+    ap.add_argument("--train", default="training/data/nl2bash_train.csv")
+    ap.add_argument("--test", default="training/data/nl2bash_test.csv")
     ap.add_argument("--out", default="training/data/distilled.jsonl")
     ap.add_argument("--limit", type=int, default=800)
     ap.add_argument("--chunk", type=int, default=40)
@@ -146,11 +146,16 @@ def main() -> int:
     ap.add_argument("--per-prompt", type=int, default=2,
                     help="how many teachers answer each intent")
     args = ap.parse_args()
+    if not (ROOT / args.train).exists() and \
+            args.train.endswith("nl2bash_train.csv"):
+        from reward import nl2bash
+        nl2bash("train")
+        nl2bash("test")        # needed too: it is what gets excluded
 
     teachers = {n: load_teacher(n) for n in args.teachers}
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    rows = load_prompts(Path(args.train), Path(args.test), args.limit, out)
+    rows = load_prompts(ROOT / args.train, ROOT / args.test, args.limit, out)
     log(f"{len(rows)} uncontaminated prompts | teachers: "
         f"{', '.join(teachers)}\n")
 
@@ -179,7 +184,7 @@ def main() -> int:
             grades = score_many(pairs) if pairs else []
 
             best: dict[str, tuple[dict, dict]] = {}
-            for (row, cand), g in zip(index, grades):
+            for (row, cand), g in zip(index, grades, strict=True):
                 cur = best.get(row["nl"])
                 if cur is None or g["reward"] > cur[1]["reward"]:
                     best[row["nl"]] = (cand, g)

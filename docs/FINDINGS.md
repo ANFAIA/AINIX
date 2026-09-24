@@ -759,3 +759,59 @@ behaviour is identical — `handle()` is the library default either way, and an
 agent that needs its own ships `handler.py` beside its manifest — but it is not
 Mojo-first on the image, and it should be. Packaging the `modular` wheel as a
 fixed-output derivation with autoPatchelf is the way through.
+
+## The fine-tune can be served — 2026-09-24
+
+`training/export_gguf.py` merges the LoRA into the HuggingFace base, converts
+and quantizes with the runner's own llama.cpp build, and refuses to install the
+result unless it answers readably. Measured on the same 60 held-out NL2Bash
+prompts, through the runner, greedy, thinking off:
+
+| | MLX adapter | Q4_K_M GGUF, served |
+|---|---|---|
+| base | 5/60 | 6/60 |
+| tuned v2 | 20/60 | **17/60** |
+
+The gain survives the export. The three-point drop is quantization.
+
+### Why the GGUF was token soup
+
+Three separate faults, each invisible until the next was fixed:
+
+1. **The tokenizer class.** transformers 5.5 in the training venv rewrote
+   `tokenizer_class` to `TokenizersBackend`; the converter's transformers
+   cannot load it. Conversion died — and the background command reported exit 0,
+   because the pipeline ended in `| tail`. The exit code was tail's.
+2. **The missing MTP block.** `mlx_lm fuse` drops Qwen3.5's multi-token
+   prediction head while the config still counts it:
+   `tensor 'blk.24.attn_norm.weight' not found`.
+3. **conv1d layout — the real one.** With both of those fixed, the model loaded
+   cleanly and answered in noise. MLX saves conv1d weights as
+   `[out, kernel, in]` (`[6144, 4, 1]`); PyTorch and the converter use
+   `[out, in, kernel]` (`[6144, 1, 4]`). Every linear-attention layer was read
+   transposed. Nothing errors; the model is simply wrong.
+
+So the merge no longer goes through MLX's save path at all. `export_gguf.py`
+applies `W += scale · (A·B)ᵀ` to the original HF tensors in float32 and leaves
+everything else — conv layout, MTP head, tokenizer, config — exactly as the
+base shipped it.
+
+`evaluate.py --endpoint LABEL URL` scores a served model with the same prompts
+and reward as the MLX path. An export is now checked by what it does through the
+runner, not by whether it loads.
+
+## Smaller things this pass found
+
+- **The NVIDIA profile never evaluated.** nixpkgs refuses the driver as
+  unfree, and the docs had said all profiles evaluate since the day they were
+  written. It now allows exactly the NVIDIA packages by name, not unfree
+  software in general. CI evaluates all four configurations on every push.
+- **The first per-agent Nix module broke x86 evaluation** by reading manifests
+  from the built plane (import-from-derivation): an arm64 host could no longer
+  type-check the x86_64, NVIDIA or AMD configurations. Manifests are read from
+  the source tree.
+- **The benchmark lived in /tmp** and was gone a month later. It is fetched into
+  `training/data/` on first use.
+- **`zip()` truncated silently** in the evaluator: a sandbox that returned fewer
+  verdicts than commands produced a lower score, not an error. The zips are
+  strict and the sandbox checks its own count.

@@ -238,7 +238,6 @@ refused. A title is a disclosure too.
 | thing | state |
 |---|---|
 | MAX on macOS | does not run a model — Metal cannot compile a metallib; CPU refuses bfloat16 |
-| GGUF export of a fine-tune | `unsloth_convert_hf_to_gguf.py` fails for Qwen3.5; adapters run under MLX only |
 | `make os-build` on macOS | needs KVM; use the netboot output |
-| NVIDIA / AMD profiles | evaluate, never booted — no such hardware here |
+| NVIDIA / AMD profiles | evaluate (CI checks it), never booted — no such hardware here |
 | free OpenRouter teachers | heavily rate-limited; a private endpoint is far better |

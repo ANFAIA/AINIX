@@ -20,14 +20,11 @@ narrating.
 | `.claude/settings.json` | read-only commands pre-allowed, so checks do not prompt |
 
 ```bash
-make smoke          # the runner answers
-make agent-check    # every manifest is legal
-make policy         # grants and clearance both fail closed
-make example-check  # the worked examples still validate
-make os-eval        # the NixOS configuration type-checks
+make test        # lint, manifests, grants + clearance, examples — python3 only
+make test-full   # + every .mojo compiles, NixOS evaluates, the runner answers
 ```
 
-Those five are the regression suite. Run them before claiming anything works.
+`make test` is what CI runs on every push. Run it before claiming anything works.
 
 One house rule above the others: **run it, do not describe it.** Nearly every
 check in this project's history turned up a real breakage that reading the code
@@ -88,7 +85,7 @@ skills; a user agent cannot read a system skill at all.
 | model runner | `qwen3.5-0.8b` **101.6 tok/s**, `gemma-3-1b` 76.7 tok/s (Q4_K_M, llama.cpp); image **96 MB**, distroless, pinned engine |
 | agent plane | 10/10 capability tests pass; end to end in 5.7 s through a Mojo agent |
 | bootable image | boots to the first-boot prompt in **5 s** in QEMU |
-| fine-tune | held-out correctness **8.3% → 36.7%** on NL2Bash test |
+| fine-tune | held-out correctness **8.3% → 36.7%** on NL2Bash test (MLX); **10% → 28%** served as Q4_K_M GGUF |
 
 What does not work is stated as plainly: **MAX does not run a model on macOS**
 — the Metal backend cannot compile a metallib even for Llama-1B, and the CPU

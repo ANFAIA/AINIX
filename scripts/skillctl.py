@@ -15,7 +15,6 @@ is the same rule expressed for tooling and for the mount-spec generator.
 
 from __future__ import annotations
 
-import shutil
 import sys
 import tomllib
 from pathlib import Path

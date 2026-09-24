@@ -14,7 +14,6 @@ import argparse
 import json
 import re
 import subprocess
-import sys
 from collections import Counter
 from pathlib import Path
 
