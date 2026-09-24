@@ -30,6 +30,9 @@ jobs:
           python-version: "3.13"
       - run: pip install modular
       - run: make mojo-build MOJO=$(command -v mojo)
+      # agentd's decisions from the compiled Mojo module: parity with the
+      # Python twin, then both policy suites with the Mojo engine mandatory.
+      - run: make mojo-policy MOJO=$(command -v mojo) MOJO_PY=$(command -v python)
 
   nixos:
     # The whole distribution type-checks: kernel, tuning, profiles, broker,

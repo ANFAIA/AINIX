@@ -973,3 +973,28 @@ The first version of that check rebuilt the path list with `tr -d "-"`, which
 also stripped the hyphens out of `ainix-agent-plane`. systemd-run would have
 failed on the mangled paths, and the negative check would have passed because
 nothing ran. The positive control is there so that cannot happen silently.
+
+## The broker decides in Mojo — 2026-09-25
+
+Until now the Mojo in this repo was entrypoints: thin `main.mojo` files handing
+control to Python. The part of agentd that matters most — the predicates behind
+every allow and deny — is now Mojo: `agents/lib/ainix_policy.mojo`, built with
+`--emit shared-lib` and registered through `PythonModuleBuilder`, so the Python
+broker calls compiled Mojo for each decision.
+
+It is the right piece to move first because it is pure: no JSON, sockets or
+HTTP (the three things Mojo's stdlib lacks), just rules. Name validation, which
+guards the path a skill request resolves to, is a byte-by-byte check because
+there is no regex — and it is the check that closed `../system/recover`.
+
+Two implementations of a security rule are two rules unless something proves
+otherwise. `test/policy-parity.py` enumerates tiers, clearance orders, labels,
+every single byte and every pair from a hostile alphabet — 744 cases, 0
+disagreements — and `make mojo-policy` then runs both policy suites with
+`AINIX_POLICY=mojo`, which fails at start rather than falling back if the module
+cannot be imported. agentd prints the engine in force (`policy mojo`).
+
+The image still uses the Python twin: no Mojo toolchain in nixpkgs. Two Mojo
+1.0 facts the modular/skills guide gets wrong or omits: a `comptime` list of
+Strings cannot be indexed at run time (it is not ImplicitlyCopyable), and there
+is no `Python.len` — use `obj.__len__()`.

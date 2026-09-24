@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check runner-check
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check runner-check mojo-policy
 
 image:
 ifeq ($(ENGINE),max)
@@ -151,7 +151,8 @@ lint:
 mojo-build:
 	@test -x "$(MOJO)" || { echo "mojo-build: no Mojo toolchain (pip install modular)"; exit 1; }
 	@fail=0; for f in $$(find agents examples training scripts -name '*.mojo' | sort); do \
-	   if $(MOJO) build "$$f" -o /tmp/ainix-mojo-check.bin >/tmp/ainix-mojo.log 2>&1; then :; \
+	   if grep -q '^def main' "$$f"; then emit=; else emit="--emit shared-lib"; fi; \
+	   if $(MOJO) build $$emit "$$f" -o /tmp/ainix-mojo-check.bin >/tmp/ainix-mojo.log 2>&1; then :; \
 	   else echo "FAIL $$f"; grep error: /tmp/ainix-mojo.log | head -3; fail=1; fi; \
 	 done; test $$fail = 0 && echo "all .mojo files compile"
 
@@ -174,4 +175,14 @@ runner-check:
 	 $(MAKE) --no-print-directory smoke PORT=$$port NAME=ainix-runner-check; rc=$$?; \
 	 docker rm -f ainix-runner-check >/dev/null 2>&1; exit $$rc
 
-test-full: test mojo-build os-eval runner-check boot-check
+# The broker's decisions compiled from Mojo, checked against their Python twin
+# on every enumerable input, then the full policy suites run with the Mojo
+# engine made mandatory (AINIX_POLICY=mojo fails if it cannot be imported).
+MOJO_PY ?= $(dir $(MOJO))python
+mojo-policy:
+	$(MOJO) build --emit shared-lib agents/lib/ainix_policy.mojo -o agents/lib/ainix_policy.so
+	$(MOJO_PY) test/policy-parity.py
+	AINIX_POLICY=mojo PY=$(MOJO_PY) ./test/agent-policy.sh
+	AINIX_POLICY=mojo PY=$(MOJO_PY) ./test/clearance-policy.sh
+
+test-full: test mojo-build mojo-policy os-eval runner-check boot-check

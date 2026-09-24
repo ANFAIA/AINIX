@@ -105,7 +105,13 @@ by card skill, so an agent finds a capability instead of hardcoding a peer.
 ## Language
 
 Mojo first. Every agent entrypoint is a `main.mojo`, and every `.mojo` file in
-the repo compiles (`make mojo-build`, and in CI). The broker's body, the base
+the repo compiles (`make mojo-build`, and in CI). **Every allow and deny agentd
+makes is decided in Mojo**: `agents/lib/ainix_policy.mojo` — name validation,
+tier-to-tier calls, skill visibility, clearance, fail-closed classification,
+caller-supplied limits — compiled as a Python extension module and imported by
+the broker. A Python twin (`policy_py.py`) stands in where Mojo is not built;
+`test/policy-parity.py` checks the two agree on every input it enumerates, and
+CI runs both policy suites with the Mojo engine mandatory. The broker's body, the base
 library and the tooling are Python behind interop, because Mojo 1.0's standard
 library has no `json`, `argparse`, `http` or `regex`, and a Mojo `def` cannot be
 passed to Python as a callback.

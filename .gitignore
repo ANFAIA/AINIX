@@ -7,3 +7,5 @@ build/
 result
 result-*
 .env.local
+agents/lib/*.so
+__mojocache__/

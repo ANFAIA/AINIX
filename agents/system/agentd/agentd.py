@@ -46,6 +46,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
+import policy  # noqa: E402  — the decisions: Mojo when built, Python twin otherwise
+
 ROOT = Path(os.environ.get("AINIX_ROOT", Path(__file__).resolve().parents[3]))
 SOCK = os.environ.get("AINIX_SOCK", "/run/ainix/agentd.sock")
 RUNNER = os.environ.get("AINIX_RUNNER", "http://127.0.0.1:8000")
@@ -83,7 +86,7 @@ GROUPS: dict = {}
 
 # Which tier may call which. A user agent asks app agents for work; app agents
 # do not reach back up, and only system agents may call system agents.
-MAY_CALL = {"user": {"app"}, "app": {"app"}, "system": {"user", "app", "system"}}
+# Which tier may call which lives in agents/lib/ainix_policy.mojo.
 
 
 def now() -> float:
@@ -146,7 +149,7 @@ def load_manifest(name: str) -> dict | None:
     parts = name.split("/")
     m = None
     if (len(parts) == 2 and parts[0] in LEVELS
-            and re.fullmatch(r"[a-z0-9][a-z0-9-]*", parts[1])):
+            and policy.valid_name(parts[1])):
         p = ROOT / "agents" / parts[0] / parts[1] / "agent.toml"
         if p.exists():
             with p.open("rb") as fh:
@@ -222,7 +225,7 @@ def may_task(caller: str, callee: str) -> tuple[bool, str]:
     if target is None:
         return False, f"{callee} does not exist"
     callee_tier = target["agent"]["tier"]
-    if callee_tier not in MAY_CALL[a["tier"]]:
+    if not policy.tier_may_call(a["tier"], callee_tier):
         return False, f"a {a['tier']} agent may not call a {callee_tier} agent"
     if callee not in a["manifest"]["agent"].get("peers", []):
         return False, f"{caller} does not list {callee!r} as a peer"
@@ -235,8 +238,7 @@ def may_read_skill(caller: str, level: str) -> tuple[bool, str]:
     a = REG.agents.get(caller)
     if not a:
         return False, "not registered"
-    visible = LEVELS[: LEVELS.index(a["tier"]) + 1]
-    if level in visible:
+    if policy.tier_sees_level(a["tier"], level):
         return True, f"{a['tier']} sees {level}"
     return False, (f"{a['tier']} agents cannot see {level} skills — {level} is "
                    f"below {a['tier']}")
@@ -258,7 +260,7 @@ def may_read_document(caller: str, doc_level: str) -> tuple[bool, str]:
         return False, f"{caller} holds no clearance"
     if doc_level not in CLEARANCE:
         return False, f"unknown classification {doc_level!r}"
-    if CLEARANCE.index(doc_level) <= CLEARANCE.index(mine):
+    if policy.clearance_covers(mine, doc_level, CLEARANCE):
         return True, f"{mine} covers {doc_level}"
     return False, (f"{caller} holds {mine}; this document is {doc_level}")
 
@@ -281,18 +283,16 @@ def documents() -> dict:
     # Fail closed: a document with no classification line — or one that names
     # a level this deployment does not have — is treated as the highest level.
     # It used to default to "public", so forgetting one line published it.
-    top = CLEARANCE[-1] if CLEARANCE else "public"
     for p in sorted(d.glob("*.md")) if d.exists() else []:
         text = p.read_text(encoding="utf-8")
         m = re.search(r"^classification:\s*(\w+)", text, re.M)
-        level = m.group(1) if m and (not CLEARANCE or m.group(1) in CLEARANCE) else top
+        level = policy.classify(m.group(1) if m else None, CLEARANCE)
         out[p.stem] = {"classification": level,
                        "title": p.stem.replace("-", " "),
                        "body": text}
     return out
 
 
-NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 
 
 def find_skill(name: str) -> tuple[str, Path] | tuple[None, None]:
@@ -302,7 +302,7 @@ def find_skill(name: str) -> tuple[str, Path] | tuple[None, None]:
     one as-is, so a user agent asking for "../system/recover" was found under
     skills/user/ — the level rule said allow, and the audit log recorded
     "user sees user" for a read of a protected system skill."""
-    if not NAME.fullmatch(name or ""):
+    if not policy.valid_name(name or ""):
         return None, None
     base = (ROOT / "skills").resolve()
     for lvl in LEVELS:
@@ -477,7 +477,7 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
             content = await asyncio.to_thread(
                 infer, msg["model"], msg["messages"],
                 msg.get("thinking", False),
-                max(1, min(int(msg.get("max_tokens", 512)), MAX_TOKENS)))
+                int(policy.clamp(int(msg.get("max_tokens", 512)), 1, MAX_TOKENS)))
             await send(w, ok=True, content=content)
 
     elif op == "task":
@@ -494,7 +494,8 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
                 {"id": tid, "from": me, "skill": msg.get("skill", ""),
                  "input": msg.get("input")})
             try:
-                limit = max(1.0, min(float(msg.get("timeout", 300)), MAX_TASK_SECONDS))
+                limit = float(policy.clamp(float(msg.get("timeout", 300)), 1.0,
+                                           MAX_TASK_SECONDS))
                 out = await asyncio.wait_for(fut, timeout=limit)
                 await send(w, ok=True, output=out)
             except asyncio.TimeoutError:
@@ -601,7 +602,7 @@ async def main() -> int:
     load_groups()
     server = await asyncio.start_unix_server(handle, str(path), limit=MAX_LINE)
     os.chmod(path, 0o660)
-    print(f"agentd listening on {path} | runner {RUNNER} | identity {IDENTITY}"
+    print(f"agentd listening on {path} | runner {RUNNER} | identity {IDENTITY} | policy {policy.ENGINE}"
           + (f" | clearance {'<'.join(CLEARANCE)}" if CLEARANCE else ""),
           file=sys.stderr, flush=True)
     async with server:
