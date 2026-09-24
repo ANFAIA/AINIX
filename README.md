@@ -85,8 +85,8 @@ at all.
 | | |
 |---|---|
 | model runner | `qwen3.5-0.8b` **101.6 tok/s**, `gemma-3-1b` 76.7 tok/s (Q4_K_M, llama.cpp); image **96 MB**, distroless, pinned engine |
-| agent plane | 10/10 capability tests pass; end to end in 5.7 s through a Mojo agent |
-| bootable image | boots to the first-boot prompt in **5 s** in QEMU |
+| agent plane | identity from disk, bound to the caller's uid by the kernel; 24 policy + 15 clearance assertions, each denial checked for its reason |
+| bootable image | boots to the first-boot prompt in **5 s** in QEMU; `make boot-check` — the image tests itself, 17 of 17, console → agent → runner → model end to end |
 | fine-tune | held-out correctness **8.3% → 36.7%** on NL2Bash test (MLX); **10% → 28%** served as Q4_K_M GGUF |
 
 What does not work is stated as plainly: **MAX does not run a model on macOS**

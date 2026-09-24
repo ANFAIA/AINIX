@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check runner-check
 
 image:
 ifeq ($(ENGINE),max)
@@ -46,7 +46,7 @@ logs:
 	docker logs -f $(NAME)
 
 smoke:
-	PORT=$(PORT) MODEL=$(MODEL) test/smoke.sh
+	PORT=$(PORT) MODEL=$(MODEL) NAME=$(NAME) test/smoke.sh
 
 bench:
 	PORT=$(PORT) MODEL=$(MODEL) bench/run.sh
@@ -164,4 +164,14 @@ test: lint agent-check policy
 boot-check:
 	./test/boot-check.sh
 
-test-full: test mojo-build os-eval smoke boot-check
+# Start a runner on a port that is actually free, smoke it, remove it. `smoke`
+# on its own assumes a runner is already up on :8000 — on a machine where some
+# other app holds :8000 that is a test of the other app.
+runner-check:
+	@port=$$(for p in $$(seq 8090 8199); do lsof -nP -iTCP:$$p -sTCP:LISTEN >/dev/null 2>&1 || { echo $$p; break; }; done); \
+	 echo "runner-check on :$$port"; \
+	 $(MAKE) --no-print-directory run PORT=$$port NAME=ainix-runner-check >/dev/null && \
+	 $(MAKE) --no-print-directory smoke PORT=$$port NAME=ainix-runner-check; rc=$$?; \
+	 docker rm -f ainix-runner-check >/dev/null 2>&1; exit $$rc
+
+test-full: test mojo-build os-eval runner-check boot-check
