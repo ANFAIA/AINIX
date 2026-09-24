@@ -23,6 +23,7 @@ outranks a 0.0 still carries signal.
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 IMAGE = "debian:stable-slim"
 TIMEOUT = 60
@@ -161,11 +162,10 @@ echo "FS:$(find /testbed /srv /var/log /tmp/work ~/Documents notes file.txt \
             _CACHE[cmd] = by_index.get(n, "RC:124\nOUT:timeout\nFS:timeout\n")
 
 
-def nl2bash(split: str) -> "Path":
+def nl2bash(split: str) -> Path:
     """The NL2Bash split, fetched once into training/data/. It used to live in
     /tmp, which the OS empties — and an evaluation whose benchmark can vanish
     between runs is not reproducible. `split` is "train" or "test"."""
-    from pathlib import Path
     import urllib.request
     dest = Path(__file__).resolve().parent / "data" / f"nl2bash_{split}.csv"
     if not dest.exists():
