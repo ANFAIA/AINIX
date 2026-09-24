@@ -83,6 +83,18 @@ in
         "! for p in \$(nix-store -qR /run/current-system); do [ -d \"\$p\" ] && find \"\$p\" -maxdepth 4 -type d -name documents; done | grep -q ."
       check "the repository is not in the image, only what it runs" \
         "! for p in \$(nix-store -qR /run/current-system | grep -- -source\$); do [ -e \"\$p/training\" ] && echo \$p; done | grep -q ."
+      # Run a process as shell-expert with its unit's own InaccessiblePaths and
+      # read the disk directly. A negative check alone could pass because the
+      # sandbox failed to start, so the positive control comes first: the same
+      # sandbox must read an app-level skill before its refusal of a system
+      # one means anything.
+      hide=$(systemctl show -p InaccessiblePaths --value ainix-agent-app-shell-expert)
+      sandbox() { systemd-run --wait --pipe --quiet -p User=ainix-app-shell-expert \
+                    -p "InaccessiblePaths=$hide" "$@"; }
+      check "in shell-expert's sandbox, an app skill is readable" \
+        "sandbox cat ${cfg.root}/skills/app/shell-command/SKILL.md"
+      check "in shell-expert's sandbox, a system skill is not" \
+        "! sandbox cat ${cfg.root}/skills/system/recover/SKILL.md"
       check "the refusal names the uid" \
         "journalctl -u ainix-agentd -o cat | grep -q 'peer uid .* is not ainix-user-shell'"
 

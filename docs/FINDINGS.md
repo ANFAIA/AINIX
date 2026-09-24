@@ -954,3 +954,22 @@ with a level the deployment does not have, now means the highest level.
 Verified both ways: against the previous broker the new test fails (the
 public-clearance scout receives the document); against the fixed one it
 passes. `test/clearance-policy.sh` is at 15.
+
+## "Never mounted" was not true on the image — 2026-09-25
+
+The skills README said a lower level's directory "is not mounted into" a higher
+tier's namespace. On the image nothing was mounted or unmounted: skills live in
+the Nix store, twice (the built plane and the filtered source), and the store is
+readable by every process. agentd refused an app agent's request for a system
+skill; `cat` would have handed it over.
+
+Each agent unit now carries the levels below its tier in `InaccessiblePaths`,
+both copies. The self-test checks it from inside: a process running as
+shell-expert, with that unit's own `InaccessiblePaths`, reads an app-level
+skill (the positive control — proving the sandbox started) and fails to read a
+system one.
+
+The first version of that check rebuilt the path list with `tr -d "-"`, which
+also stripped the hyphens out of `ainix-agent-plane`. systemd-run would have
+failed on the mangled paths, and the negative check would have passed because
+nothing ran. The positive control is there so that cannot happen silently.

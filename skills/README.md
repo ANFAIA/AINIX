@@ -26,10 +26,20 @@ and at every level above it, and cannot see the levels below.**
 | **app** | read + write | read + write | not visible |
 | **system** | read + write | read + write | read + write |
 
-So a system agent can rewrite a user agent's skills — that is how the system
-tier keeps the tiers above it working and correct. A user agent cannot read a
-system skill at all: the directory is not mounted into its namespace, so it is
-absent rather than denied. Same enforcement as model grants.
+So a system agent may change a user agent's skills — that is how the system
+tier keeps the tiers above it working and correct. Changes land as commits to
+the tree and a rebuild, not as writes at run time: the skills an image runs
+are in its read-only store.
+
+A user agent cannot read a system skill, enforced twice. agentd refuses the
+request, and — because the Nix store is readable by every process — each agent
+unit on the image is started with the levels below its tier in
+`InaccessiblePaths`, so the files are absent from its view of the disk, not
+merely refused. The boot self-test reads the disk from inside an app agent's
+sandbox to check both halves: its own level readable, the system level not.
+
+Skills are procedures, not secrets. Visibility follows the tier, but never put
+a credential in a skill.
 
 `protected = true` in `skill.toml` takes a skill out of that entirely: only a
 human commit changes it, whatever tier is asking. Used for skills whose failure

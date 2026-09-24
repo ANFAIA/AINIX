@@ -60,10 +60,12 @@ user/shell  →  agentd  →  app/shell-expert  →  agentd  →  model runner
    no model grant          holds the grant       holds the URL
 ```
 
-Skills follow the same ordering: a tier reads and modifies its own level and
-every level *above* it, and cannot see the levels below — those directories are
-never mounted into its namespace. A system agent can repair a user agent's
-skills; a user agent cannot read a system skill at all.
+Skills follow the same ordering: a tier reads its own level and every level
+*above* it, and cannot see the levels below — agentd refuses the request, and on
+the image the lower levels are `InaccessiblePaths` in the agent's own unit, so
+they are absent from its view of the disk too. A system agent may change a user
+agent's skills (by commit and rebuild); a user agent cannot read a system skill
+at all.
 
 ## Layers
 

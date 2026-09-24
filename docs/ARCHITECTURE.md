@@ -79,7 +79,10 @@ Procedures agents load, at the same three levels, ordered by privilege: `user`
 is the top and least privileged, `system` the bottom and most privileged. **A
 tier reads skills at its own level and every level above it, never below.**
 Skill names are validated before they touch a path, and the resolved file must
-sit inside its level — `../system/recover` is not a way in.
+sit inside its level — `../system/recover` is not a way in. On the image each
+agent unit also has the levels below its tier in `InaccessiblePaths`, in both
+store copies, because the store is readable by every process: without that, an
+app agent could `cat` a system skill agentd would refuse to give it.
 
 `protected = true` marks a skill as changed by human commit only.
 `skills/system/recover` is protected: it is the procedure for when the agents

@@ -44,6 +44,17 @@ let
   daemons = lib.filter (a: a.tier != "user" && !(lib.elem a.id special)) agents;
 
   memOf = a: a.manifest.quota.memory or "512Mi";
+
+  # Skill levels this agent's tier may not see: the ones below it. They exist
+  # in two store paths — the built plane and the filtered source first boot
+  # reads from — and the store is readable by every process, so without this
+  # an app agent could `cat` a system skill agentd would refuse to hand it.
+  levels = [ "user" "app" "system" ];
+  below = tier: lib.drop (lib.lists.findFirstIndex (l: l == tier) 0 levels + 1) levels;
+  hiddenSkills = a: lib.concatMap (lvl: [
+    "-${plane}/skills/${lvl}"
+    "-${ainixSrc}/skills/${lvl}"
+  ]) (below a.tier);
   # "512Mi" -> "512M": systemd wants K/M/G, manifests use the Kubernetes spelling.
   toSystemd = q: lib.replaceStrings [ "Ki" "Mi" "Gi" ] [ "K" "M" "G" ] q;
 in
@@ -101,6 +112,7 @@ in
           IPAddressDeny = "any";
           SystemCallFilter = [ "@system-service" ];
           ReadOnlyPaths = [ "${plane}" ];
+          InaccessiblePaths = hiddenSkills a;
         };
       }) daemons);
   };
