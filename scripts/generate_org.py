@@ -135,7 +135,7 @@ def normalise_peers(spec: dict) -> list[str]:
 
 def write_org(spec: dict, out: Path, catalog: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    (out / "models.toml").write_text(catalog.read_text())
+    (out / "models.toml").write_text(catalog.read_text(encoding="utf-8"), encoding="utf-8")
 
     levels = ["public", "internal", "confidential", "restricted"]
     lines = ["# Generated. Clearance is granted to a group; an agent may hold",
@@ -145,7 +145,7 @@ def write_org(spec: dict, out: Path, catalog: Path) -> None:
         lines += [f"[groups.{g}]",
                   f'description = {json.dumps(v.get("description", ""))}',
                   f'clearance   = {json.dumps(v.get("clearance", "internal"))}', ""]
-    (out / "groups.toml").write_text("\n".join(lines))
+    (out / "groups.toml").write_text("\n".join(lines), encoding="utf-8")
 
     for a in spec["agents"]:
         d = out / "agents" / a["tier"] / a["name"]
@@ -182,7 +182,7 @@ outputs     = "json"
 mode   = {json.dumps("frozen" if frozen else "self")}
 allow  = {json.dumps([] if frozen else ["card", "prompt"])}
 review = "required"
-""")
+""", encoding="utf-8")
         (d / "main.mojo").write_text(f"""# {a.get("domain", a["name"])}
 
 from std.python import Python
@@ -197,7 +197,7 @@ def main() raises:
         if not task:
             break
         agent.reply(task, agent.handle(task))
-""")
+""", encoding="utf-8")
         for s in a.get("skills", []):
             sd = out / "skills" / s.get("level", a["tier"]) / s["name"]
             sd.mkdir(parents=True, exist_ok=True)
@@ -209,13 +209,13 @@ description = {json.dumps(s.get("description", ""))}
 requires_tools  = []
 requires_models = []
 protected   = false
-""")
+""", encoding="utf-8")
             steps = "\n".join(f"{i}. {t}" for i, t in
                               enumerate(s.get("procedure", []), 1))
             (sd / "SKILL.md").write_text(
                 f"# {s['name']}\n\n{s.get('description','')}\n\n"
                 f"## Procedure\n\n{steps}\n\n"
-                f"## Never\n\n{s.get('never','')}\n")
+                f"## Never\n\n{s.get('never','')}\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -233,7 +233,7 @@ def main() -> int:
     names = [k for k in cat if k != "remote"] + \
             [f"remote.{k}" for k in cat.get("remote", {})]
 
-    brief = (ROOT / args.brief).read_text()
+    brief = (ROOT / args.brief).read_text(encoding="utf-8")
     teacher = load_teacher(args.teacher)
     print(f"asking {args.teacher} to design the org…")
     raw = ask(teacher, CONTRACT % json.dumps(names) + "\n\nThe organisation:\n"

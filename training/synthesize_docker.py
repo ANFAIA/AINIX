@@ -128,7 +128,7 @@ def ensure_image() -> None:
         print(f"building {IMAGE} (one-time) ...")
         with tempfile.TemporaryDirectory() as td:
             ctx = Path(td) / "Dockerfile"
-            ctx.write_text(DOCKERFILE)
+            ctx.write_text(DOCKERFILE, encoding="utf-8")
             subprocess.run(["docker", "build", "-t", IMAGE, td], check=True)
 
 
@@ -152,7 +152,7 @@ def main() -> int:
 
     docs = sorted(ROOT.glob(args.corpus))
     units = [(d.name, i, t) for d in docs
-             for i, t in enumerate(chunk(d.read_text(errors="replace")))]
+             for i, t in enumerate(chunk(d.read_text(errors="replace", encoding="utf-8")))]
     if args.limit:
         units = units[: args.limit]
     print(f"{len(units)} chunks from {len(docs)} docs | image {IMAGE}")
@@ -162,7 +162,7 @@ def main() -> int:
 
     kept = rejected = 0
     try:
-        with out.open("a") as fh:
+        with out.open("a", encoding="utf-8") as fh:
             for name, idx, text in units:
                 n = max(4, args.per_doc // 2)
                 prompt = (

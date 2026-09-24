@@ -105,7 +105,7 @@ def cmd_list(argv: list[str]) -> int:
 
 def cmd_show(argv: list[str]) -> int:
     level, name = _split(argv[0])
-    print((SKILLS / level / name / "SKILL.md").read_text())
+    print((SKILLS / level / name / "SKILL.md").read_text(encoding="utf-8"))
     return 0
 
 
@@ -135,7 +135,8 @@ def cmd_new(argv: list[str]) -> int:
         'description = "one line — what this skill does"\n'
         "requires_tools  = []\n"
         "requires_models = []\n"
-        "protected   = false\n"
+        "protected   = false\n",
+        encoding="utf-8",
     )
     (dest / "SKILL.md").write_text(
         f"# {name}\n\n"
@@ -143,7 +144,8 @@ def cmd_new(argv: list[str]) -> int:
         "## Procedure\n\n"
         "1. \n2. \n3. \n\n"
         "## When not to\n\n"
-        "The cases where this skill is the wrong tool.\n"
+        "The cases where this skill is the wrong tool.\n",
+        encoding="utf-8",
     )
     print(f"created {dest.relative_to(ROOT)}")
     return 0

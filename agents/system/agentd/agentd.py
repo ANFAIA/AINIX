@@ -19,6 +19,13 @@ agentd holds addresses, and hands out nothing a manifest did not ask for.
   tools       a tool is reachable only if the manifest granted it by name.
   audit       every allow and every deny, with a reason.
 
+  identity    an agent says only its NAME. Its manifest is read from the agent
+              tree on disk — never taken from the caller, or every grant in the
+              system would be whatever the caller claimed. With
+              AINIX_IDENTITY=uid the name is also bound to the connecting
+              process's uid (SO_PEERCRED / LOCAL_PEERCRED), so an agent cannot
+              claim to be another one either.
+
 Deny is the default. Anything not explicitly granted is refused, and a refusal
 is an answer — agents do not retry them.
 """
@@ -30,7 +37,10 @@ import json
 import os
 import sys
 import time
+import pwd
 import re
+import socket
+import struct
 import tomllib
 import urllib.request
 from pathlib import Path
@@ -38,6 +48,13 @@ from pathlib import Path
 ROOT = Path(os.environ.get("AINIX_ROOT", Path(__file__).resolve().parents[3]))
 SOCK = os.environ.get("AINIX_SOCK", "/run/ainix/agentd.sock")
 RUNNER = os.environ.get("AINIX_RUNNER", "http://127.0.0.1:8000")
+
+# "uid": a name is accepted only from the uid of the system user
+#        ainix-<tier>-<name>, which is how the image runs each agent.
+# "name": the manifest still comes from disk, but any local process in the
+#        broker's group may claim any name. Development only, and every
+#        registration says so in the audit log.
+IDENTITY = os.environ.get("AINIX_IDENTITY", "name")
 
 # Top (least privileged) to bottom. A tier sees its own level and every level
 # above it — the same ordering scripts/skillctl.py enforces.
@@ -70,21 +87,86 @@ def load_groups() -> None:
 
 
 class Registry:
+    """Live agents only. An agent is in here while its connection is open and
+    not a moment longer — a registration that outlives its process is a queue
+    that swallows tasks until they time out."""
+
     def __init__(self):
-        self.agents: dict[str, dict] = {}      # name -> {manifest, card, tier}
+        self.agents: dict[str, dict] = {}      # name -> {manifest, tier, card}
         self.inbox: dict[str, asyncio.Queue] = {}
-        self.pending: dict[str, asyncio.Future] = {}
+        self.pending: dict[str, tuple[asyncio.Future, str]] = {}  # tid -> (fut, callee)
         self.seq = 0
 
     def add(self, name: str, manifest: dict) -> None:
         a = manifest["agent"]
         self.agents[name] = {"manifest": manifest, "tier": a["tier"],
                              "card": manifest.get("card", {})}
-        self.inbox.setdefault(name, asyncio.Queue())
+        self.inbox[name] = asyncio.Queue()
+
+    def remove(self, name: str) -> None:
+        self.agents.pop(name, None)
+        self.inbox.pop(name, None)
+        # Anyone waiting on this agent gets an answer now instead of a timeout.
+        for tid, (fut, callee) in list(self.pending.items()):
+            if callee == name and not fut.done():
+                fut.set_exception(ConnectionError(f"{name} went away"))
+                self.pending.pop(tid, None)
 
     def next_id(self) -> str:
         self.seq += 1
         return f"t{self.seq}"
+
+
+_MANIFESTS: dict[str, dict | None] = {}
+
+
+def load_manifest(name: str) -> dict | None:
+    """The authoritative manifest for `tier/name`, read from the agent tree.
+
+    This is the whole capability system in one function: whatever a caller
+    sends, the grants that apply are the ones on disk, which Nix built and a
+    human reviewed."""
+    if name in _MANIFESTS:
+        return _MANIFESTS[name]
+    parts = name.split("/")
+    m = None
+    if (len(parts) == 2 and parts[0] in LEVELS
+            and re.fullmatch(r"[a-z0-9][a-z0-9-]*", parts[1])):
+        p = ROOT / "agents" / parts[0] / parts[1] / "agent.toml"
+        if p.exists():
+            with p.open("rb") as fh:
+                m = tomllib.load(fh)
+            a = m.get("agent", {})
+            if a.get("tier") != parts[0] or a.get("name") != parts[1]:
+                m = None           # a manifest that disagrees with its path
+    _MANIFESTS[name] = m
+    return m
+
+
+def peer_uid(sock: socket.socket | None) -> int | None:
+    """The uid of the process on the other end of a Unix socket, from the
+    kernel rather than from anything the process said."""
+    if sock is None:
+        return None
+    try:
+        if sys.platform.startswith("linux"):
+            raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                  struct.calcsize("3i"))
+            return struct.unpack("3i", raw)[1]
+        if sys.platform == "darwin":
+            # SOL_LOCAL = 0, LOCAL_PEERCRED = 1 -> struct xucred
+            raw = sock.getsockopt(0, 1, 76)
+            return struct.unpack_from("I", raw, 4)[0]
+    except OSError:
+        return None
+    return None
+
+
+def expected_uid(name: str) -> int | None:
+    try:
+        return pwd.getpwnam("ainix-" + name.replace("/", "-")).pw_uid
+    except KeyError:
+        return None
 
 
 REG = Registry()
@@ -115,15 +197,22 @@ def may_use_model(name: str, model: str) -> tuple[bool, str]:
 
 
 def may_task(caller: str, callee: str) -> tuple[bool, str]:
-    a, b = REG.agents.get(caller), REG.agents.get(callee)
+    """Policy first, liveness last. Whether an agent is running is itself
+    information, and a caller with no right to reach it should learn the rule
+    that stops it — not whether the target happens to be up."""
+    a = REG.agents.get(caller)
     if not a:
         return False, "caller not registered"
-    if not b:
-        return False, f"{callee} is not registered"
-    if b["tier"] not in MAY_CALL[a["tier"]]:
-        return False, f"a {a['tier']} agent may not call a {b['tier']} agent"
+    target = load_manifest(callee)
+    if target is None:
+        return False, f"{callee} does not exist"
+    callee_tier = target["agent"]["tier"]
+    if callee_tier not in MAY_CALL[a["tier"]]:
+        return False, f"a {a['tier']} agent may not call a {callee_tier} agent"
     if callee not in a["manifest"]["agent"].get("peers", []):
         return False, f"{caller} does not list {callee!r} as a peer"
+    if callee not in REG.agents:
+        return False, f"{callee} is not running"
     return True, "listed as a peer"
 
 
@@ -175,7 +264,7 @@ def documents() -> dict:
     out = {}
     d = ROOT / "documents"
     for p in sorted(d.glob("*.md")) if d.exists() else []:
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         m = re.search(r"^classification:\s*(\w+)", text, re.M)
         out[p.stem] = {"classification": m.group(1) if m else "public",
                        "title": p.stem.replace("-", " "),
@@ -228,6 +317,7 @@ def infer(model: str, messages: list, thinking: bool = False,
 
 async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     me = None                       # set by register; identity is per-connection
+    uid = peer_uid(writer.get_extra_info("socket"))
     try:
         while True:
             line = await reader.readline()
@@ -238,10 +328,25 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
             except json.JSONDecodeError:
                 await send(writer, ok=False, error="malformed JSON")
                 continue
-            me = await dispatch(msg, me, writer)
+            try:
+                me = await dispatch(msg, me, writer, uid, reader)
+            except (ConnectionResetError, asyncio.IncompleteReadError):
+                raise
+            except Exception as e:
+                # One broken request must not take the connection — or, worse,
+                # the agent's registration — down with it. The caller gets an
+                # error it can report; the audit log gets the reason.
+                audit(me or "?", str(msg.get("op")), "-", False,
+                      f"internal error: {type(e).__name__}: {e}")
+                await send(writer, ok=False,
+                           error=f"agentd failed on {msg.get('op')!r}: "
+                                 f"{type(e).__name__}")
     except (ConnectionResetError, asyncio.IncompleteReadError):
         pass
     finally:
+        if me is not None:
+            REG.remove(me)
+            audit(me, "unregister", me, True, "connection closed")
         writer.close()
 
 
@@ -250,27 +355,59 @@ async def send(w: asyncio.StreamWriter, **kw) -> None:
     await w.drain()
 
 
-async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter):
+async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
+                   uid: int | None = None,
+                   reader: asyncio.StreamReader | None = None):
     op = msg.get("op")
 
     if op == "register":
-        m = msg["manifest"]
-        a = m["agent"]
-        me = f"{a['tier']}/{a['name']}"
-        REG.add(me, m)
-        audit(me, "register", me, True, f"tier={a['tier']}")
-        await send(w, ok=True, name=me)
-        return me
+        if me is not None:
+            await send(w, ok=False, error=f"already registered as {me}")
+            return me
+        if "manifest" in msg:
+            # Refused rather than ignored: a client that sends grants is either
+            # out of date or trying something, and neither should be silent.
+            audit(str(msg.get("name")), "register", "-", False,
+                  "sent a manifest — grants come from disk, send a name")
+            await send(w, ok=False, error="manifests come from the agent tree "
+                       "on disk; register with a name, not a manifest")
+            return None
+        name = str(msg.get("name", ""))
+        m = load_manifest(name)
+        if m is None:
+            audit(name, "register", name, False, "no such agent in the tree")
+            await send(w, ok=False, error=f"no agent {name!r} in the agent tree")
+            return None
+        if name in REG.agents:
+            audit(name, "register", name, False, "already live")
+            await send(w, ok=False, error=f"{name} is already registered "
+                       f"by another connection")
+            return None
+        if IDENTITY == "uid":
+            want = expected_uid(name)
+            if want is None or uid != want:
+                audit(name, "register", name, False,
+                      f"peer uid {uid} is not ainix-{name.replace('/', '-')}")
+                await send(w, ok=False, error=f"this process may not act as {name}")
+                return None
+        REG.add(name, m)
+        audit(name, "register", name, True,
+              f"tier={m['agent']['tier']} identity={IDENTITY}"
+              + ("" if IDENTITY == "uid" else " (UNBOUND: dev mode)"))
+        await send(w, ok=True, name=name)
+        return name
 
     if me is None:
         await send(w, ok=False, error="register first")
         return me
 
     if op == "discover":
+        # "*" lists every live agent this caller may task. Discovery never
+        # shows an agent the caller could not reach anyway.
         skill = msg.get("skill", "")
         cards = [{"name": n, "tier": v["tier"], **v["card"]}
                  for n, v in REG.agents.items()
-                 if skill in v["card"].get("skills", [])
+                 if (skill == "*" or skill in v["card"].get("skills", []))
                  and may_task(me, n)[0]]
         audit(me, "discover", skill, True, f"{len(cards)} match")
         await send(w, ok=True, cards=cards)
@@ -299,7 +436,7 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter):
         else:
             tid = REG.next_id()
             fut = asyncio.get_running_loop().create_future()
-            REG.pending[tid] = fut
+            REG.pending[tid] = (fut, callee)
             await REG.inbox[callee].put(
                 {"id": tid, "from": me, "skill": msg.get("skill", ""),
                  "input": msg.get("input")})
@@ -309,14 +446,44 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter):
             except asyncio.TimeoutError:
                 REG.pending.pop(tid, None)
                 await send(w, ok=False, error=f"{callee} did not answer in time")
+            except ConnectionError as e:
+                await send(w, ok=False, error=str(e))
 
     elif op == "next_task":
-        task = await REG.inbox[me].get()
-        await send(w, ok=True, task=task)
+        # Wait for a task AND for the caller to leave. An agent blocked here
+        # sends nothing, so without watching for EOF a killed agent stays
+        # registered — and the next task addressed to it is swallowed until it
+        # times out.
+        get = asyncio.ensure_future(REG.inbox[me].get())
+        waiters = {get}
+        eof = None
+        if reader is not None:
+            eof = asyncio.ensure_future(reader.read(1))
+            waiters.add(eof)
+        done, _ = await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+        if eof is not None and eof in done:
+            get.cancel()
+            raise ConnectionResetError(f"{me} left while waiting for a task")
+        if eof is not None:
+            # Cancelling is asynchronous: until the read has actually unwound,
+            # the stream still has a waiter, and the next readline() in the
+            # handler loop dies with "another coroutine is already waiting".
+            eof.cancel()
+            try:
+                await eof
+            except asyncio.CancelledError:
+                pass
+        await send(w, ok=True, task=get.result())
 
     elif op == "reply":
-        fut = REG.pending.pop(msg["task_id"], None)
-        if fut and not fut.done():
+        entry = REG.pending.get(msg.get("task_id"))
+        # Only the agent the task was sent to may answer it.
+        if entry is None or entry[1] != me:
+            await send(w, ok=False, error="no such task for you")
+            return me
+        REG.pending.pop(msg["task_id"], None)
+        fut = entry[0]
+        if not fut.done():
             fut.set_result(msg.get("output"))
         await send(w, ok=True)
 
@@ -328,7 +495,7 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter):
         else:
             ok, why = may_read_skill(me, level)
             audit(me, "skill", f"{level}/{msg['name']}", ok, why)
-            await send(w, ok=ok, text=path.read_text() if ok else "",
+            await send(w, ok=ok, text=path.read_text(encoding="utf-8") if ok else "",
                        error=None if ok else why)
 
     elif op == "document":
@@ -359,6 +526,10 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter):
         await send(w, ok=ok, error=None if ok else why)
 
     elif op == "status":
+        if REG.agents[me]["tier"] != "system":
+            audit(me, "status", "-", False, "system tier only")
+            await send(w, ok=False, error="status is a system operation")
+            return me
         await send(w, ok=True, agents={n: v["tier"] for n, v in REG.agents.items()},
                    audit=AUDIT[-20:])
 
@@ -376,7 +547,7 @@ async def main() -> int:
     load_groups()
     server = await asyncio.start_unix_server(handle, str(path))
     os.chmod(path, 0o660)
-    print(f"agentd listening on {path} | runner {RUNNER}"
+    print(f"agentd listening on {path} | runner {RUNNER} | identity {IDENTITY}"
           + (f" | clearance {'<'.join(CLEARANCE)}" if CLEARANCE else ""),
           file=sys.stderr, flush=True)
     async with server:

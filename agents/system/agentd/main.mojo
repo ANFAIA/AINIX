@@ -10,8 +10,9 @@ from std.os import getenv
 
 
 def main() raises:
-    var here = getenv("AINIX_AGENTD_DIR")
-    Python.add_to_path(here.value() if here else ".")
+    # In Mojo 1.0 getenv returns a String with a default, not an Optional —
+    # the modular/skills interop guide says otherwise, and the compiler wins.
+    Python.add_to_path(getenv("AINIX_AGENTD_DIR", "."))
 
     var agentd = Python.import_module("agentd")
     var asyncio = Python.import_module("asyncio")

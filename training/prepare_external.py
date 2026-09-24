@@ -102,7 +102,7 @@ def main() -> int:
     out = Path(args.out)
     existing = []
     if out.exists():
-        for line in out.read_text().splitlines():
+        for line in out.read_text(encoding="utf-8").splitlines():
             try:
                 rec = json.loads(line)
                 if rec.get("meta", {}).get("teacher") == "human":
@@ -112,7 +112,7 @@ def main() -> int:
                 continue
 
     tmp = out.with_suffix(".tmp")
-    with tmp.open("w") as fh:
+    with tmp.open("w", encoding="utf-8") as fh:
         for rec in existing + records:
             fh.write(json.dumps(rec) + "\n")
     tmp.rename(out)

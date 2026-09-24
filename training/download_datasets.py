@@ -62,7 +62,7 @@ def write(name: str, records: list[dict]) -> Path:
             continue
         seen.add(key)
         rows.append(r)
-    with out.open("w") as fh:
+    with out.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r) + "\n")
     print(f"{name:28} {len(rows):5} records -> {out.name}")
@@ -195,7 +195,7 @@ def merge() -> int:
 
     # Existing final file: keep grounded (teacher) + synth records.
     if FINAL.exists():
-        for line in FINAL.read_text().splitlines():
+        for line in FINAL.read_text(encoding="utf-8").splitlines():
             try:
                 rec = json.loads(line)
             except json.JSONDecodeError:
@@ -204,7 +204,7 @@ def merge() -> int:
                 add(rec)
 
     for src in sorted(SRC.glob("*.jsonl")):
-        for line in src.read_text().splitlines():
+        for line in src.read_text(encoding="utf-8").splitlines():
             try:
                 add(json.loads(line))
             except json.JSONDecodeError:
@@ -213,7 +213,7 @@ def merge() -> int:
     rows = sorted(parts.values(),
                   key=lambda r: r.get("meta", {}).get("source", ""))
     tmp = FINAL.with_suffix(".tmp")
-    with tmp.open("w") as fh:
+    with tmp.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r) + "\n")
     tmp.rename(FINAL)

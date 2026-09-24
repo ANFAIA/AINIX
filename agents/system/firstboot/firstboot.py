@@ -66,7 +66,8 @@ def write_state(model: str, online: bool) -> None:
         "complete = true\n"
         f"online = {str(online).lower()}\n"
         "\n[model]\n"
-        f'default = "{model}"\n'
+        f'default = "{model}"\n',
+        encoding="utf-8",
     )
 
 
@@ -92,7 +93,7 @@ def total_ram_gb() -> float | None:
                 ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, check=True
             )
             return int(out.stdout) / 1024**3
-        for line in Path("/proc/meminfo").read_text().splitlines():
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
             if line.startswith("MemTotal:"):
                 return int(line.split()[1]) / 1024**2
     except Exception:

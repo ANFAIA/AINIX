@@ -98,7 +98,7 @@ def main() -> int:
 
     pool = []
     seen_prompts = set()
-    for line in DATA.read_text().splitlines():
+    for line in DATA.read_text(encoding="utf-8").splitlines():
         try:
             r = json.loads(line)
         except json.JSONDecodeError:
@@ -133,7 +133,7 @@ def main() -> int:
     kept = weak = pruned = 0
     pruned_keys: set[str] = set()
     t_start = time.time()
-    with OUT.open("w") as fh:
+    with OUT.open("w", encoding="utf-8") as fh:
         for i, task in enumerate(tasks):
             msgs = [{"role": "system",
                      "content": ("You are the AINIX assistant. Answer with ONLY "
@@ -241,14 +241,14 @@ def main() -> int:
         "minutes": round((time.time() - t_start) / 60, 1),
         "results": sorted(results, key=lambda r: r["pass_rate"]),
     }
-    REPORT.write_text(json.dumps(report, indent=2))
+    REPORT.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\nmean pass rate {avg:.0%} | learned {n_learned} | "
           f"kept {kept} new verified records -> {OUT.name}")
     print(f"pruned {pruned} broken records | weak spots {weak} -> {REPORT.name}")
 
     # Merge: drop environment-failing records, add RL-mined hard positives.
     existing = {}
-    for line in DATA.read_text().splitlines():
+    for line in DATA.read_text(encoding="utf-8").splitlines():
         try:
             r = json.loads(line)
             key = r["messages"][1]["content"].lower()
@@ -259,7 +259,7 @@ def main() -> int:
             continue
     added = updated = 0
     if OUT.exists() and kept:
-        for line in OUT.read_text().splitlines():
+        for line in OUT.read_text(encoding="utf-8").splitlines():
             r = json.loads(line)
             key = r["messages"][1]["content"].lower()
             if key in existing:
@@ -277,7 +277,7 @@ def main() -> int:
     tmp = DATA.with_suffix(".tmp")
     rows = sorted(existing.values(),
                   key=lambda r: r.get("meta", {}).get("source", ""))
-    with tmp.open("w") as fh:
+    with tmp.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r) + "\n")
     tmp.rename(DATA)

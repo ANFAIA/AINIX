@@ -123,8 +123,11 @@ class Agent:
     def from_manifest(cls, path: str = "agent.toml") -> "Agent":
         with open(path, "rb") as fh:
             m = tomllib.load(fh)
+        a = m["agent"]
         conn = Conn()
-        conn.call("register", manifest=m)
+        # The name only. agentd reads the manifest from the agent tree itself;
+        # the local copy tells this process who it is, never what it may do.
+        conn.call("register", name=f"{a['tier']}/{a['name']}")
         return cls(m, conn)
 
     # --- capabilities -----------------------------------------------------
@@ -162,6 +165,60 @@ class Agent:
         """Read a skill's SKILL.md. agentd enforces the level rule: own level
         and everything above it, never below."""
         return self._conn.call("skill", name=name)["text"]
+
+    # --- default behaviour --------------------------------------------------
+    def handle(self, task):
+        """What an agent does when its entrypoint does not say otherwise: load
+        its skills as the system prompt and ask its first granted model.
+
+        Most domain agents are exactly this — a model, a procedure, a contract —
+        so it lives here once instead of in every main.mojo. An agent with no
+        model grant cannot use the default and says so rather than guessing."""
+        models = self.manifest["agent"].get("models", [])
+        if not models:
+            return {"error": f"{self.name} holds no model grant; its entrypoint "
+                             f"must implement handle() itself"}
+        skills = []
+        for name in self.manifest["agent"].get("skills", []):
+            try:
+                skills.append(self.skill(name))
+            except Denied:
+                continue
+        system = "\n\n".join(skills) or self.manifest.get("card", {}).get(
+            "description", "")
+        payload = task.get("input") if isinstance(task, dict) else task
+        return self.model(models[0]).complete_json(system=system,
+                                                    user=str(payload))
+
+    def route(self, request: str) -> str:
+        """Pick which card skill a request is for, by word overlap with the
+        cards of agents this one may call. Deterministic and model-free on
+        purpose: user agents hold no model grant, and routing a human's words
+        must not be the thing that needs one."""
+        words = {w.strip(".,?!").lower() for w in request.split() if len(w) > 3}
+        best, score = "", 0
+        for card in self.discover("*"):
+            text = (card.get("description", "") + " " +
+                    " ".join(card.get("skills", []))).lower()
+            hits = sum(1 for w in words if w in text)
+            if hits > score and card.get("skills"):
+                best, score = card["skills"][0], hits
+        return best
+
+    def render(self, answer) -> str:
+        """An answer for a person: the content first, a refusal as a refusal."""
+        if isinstance(answer, dict):
+            if "error" in answer:
+                return f"could not: {answer['error']}"
+            if "command" in answer:
+                out = answer["command"]
+                if answer.get("explain"):
+                    out += f"\n  {answer['explain']}"
+                if answer.get("mutates"):
+                    out += "\n  (changes something — confirm before running)"
+                return out
+            return json.dumps(answer, indent=2, ensure_ascii=False)
+        return str(answer)
 
     # --- serving ----------------------------------------------------------
     def next_task(self, timeout: float | None = None):

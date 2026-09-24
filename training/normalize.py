@@ -96,7 +96,7 @@ def main() -> int:
         if not p.exists():
             print(f"  ! missing: {path}")
             continue
-        for line in p.read_text().splitlines():
+        for line in p.read_text(encoding="utf-8").splitlines():
             try:
                 r = json.loads(line)
                 msgs = r["messages"]
@@ -130,7 +130,7 @@ def main() -> int:
             seen[key] = out
 
     out = ROOT / args.out
-    with out.open("w") as fh:
+    with out.open("w", encoding="utf-8") as fh:
         for r in seen.values():
             fh.write(json.dumps(r) + "\n")
 

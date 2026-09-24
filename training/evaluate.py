@@ -61,7 +61,7 @@ def training_prompts(paths: list[str]) -> set[str]:
         p = ROOT / path
         if not p.exists():
             continue
-        for line in p.read_text().splitlines():
+        for line in p.read_text(encoding="utf-8").splitlines():
             try:
                 out.add(json.loads(line)["messages"][1]["content"].strip().lower())
             except Exception:
@@ -181,7 +181,7 @@ def main() -> int:
               f"same-utility {stats['matches']:2}/{n}  "
               f"CORRECT {stats['correct']:2}/{n}")
 
-    Path(args.out).write_text(json.dumps(report, indent=2))
+    Path(args.out).write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\n-> {args.out}")
     return 0
 

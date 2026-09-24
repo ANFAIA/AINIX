@@ -51,6 +51,10 @@ in
         AINIX_ROOT = "${cfg.root}";
         AINIX_RUNNER = "http://127.0.0.1:${toString config.ainix.runner.port}";
         PYTHONPATH = "${cfg.root}/agents/lib";
+        # systemd services get no LANG, so Python falls back to ASCII and the
+        # first SKILL.md with an em dash kills the read. The code says utf-8
+        # explicitly everywhere now; this covers anything that does not.
+        PYTHONUTF8 = "1";
       };
 
       serviceConfig = {

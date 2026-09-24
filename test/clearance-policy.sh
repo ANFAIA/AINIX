@@ -8,12 +8,12 @@
 set -u
 cd "$(dirname "$0")/.."
 
-export AINIX_SOCK=${AINIX_SOCK:-/tmp/ainix-clearance.sock}
+export AINIX_SOCK=${AINIX_SOCK:-${TMPDIR:-/tmp}/ainix-clearance.sock}
 export AINIX_ROOT=$PWD/examples/acme
 export PYTHONPATH=$PWD/agents/lib
-PY=${PY:-/opt/homebrew/bin/python3}
+PY=${PY:-python3}
 
-$PY agents/system/agentd/agentd.py 2>/tmp/agentd-clearance.log &
+$PY agents/system/agentd/agentd.py 2>"${TMPDIR:-/tmp}/agentd-clearance.log" &
 AGENTD=$!
 trap 'kill $AGENTD 2>/dev/null; rm -f "$AINIX_SOCK"' EXIT
 for _ in $(seq 50); do [ -S "$AINIX_SOCK" ] && break; sleep 0.1; done
@@ -28,8 +28,8 @@ from ainix_agent import Agent, Conn, Denied
 def load(p):
     a = Agent.__new__(Agent); a._conn = Conn()
     with open(p,'rb') as fh: a.manifest = tomllib.load(fh)
-    a._conn.call('register', manifest=a.manifest)
     x = a.manifest['agent']; a.name=f\"{x['tier']}/{x['name']}\"; a.tier=x['tier']
+    a._conn.call('register', name=a.name)
     return a
 try:
     print($code)
@@ -66,6 +66,16 @@ check "nobody but the librarian reads personal records"   DENIED \
   "load('$A/competitors/agent.toml').document('employee-handbook-appendix')"
 check "the librarian does"                                restricted \
   "load('$A/librarian/agent.toml').document('employee-handbook-appendix')['classification']"
+
+echo
+echo "the exploit this suite once missed"
+# Before identity came from disk, any process could register with a manifest it
+# wrote itself — clearance included — and read these records. Kept as a test so
+# the hole cannot quietly reopen.
+check "a forged restricted manifest reads nothing"     DENIED \
+  "Conn().call('register', manifest={'agent':{'name':'evil','tier':'system'},'documents':{'clearance':'restricted'}})"
+check "an invented agent name reads nothing"           DENIED \
+  "Conn().call('register', name='system/evil')"
 
 echo
 echo "tool grants"

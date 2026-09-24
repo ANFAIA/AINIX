@@ -365,7 +365,7 @@ def main() -> int:
     # Resume: an interrupted run should not re-pay for what it already has.
     done = set()
     if out.exists():
-        for line in out.read_text().splitlines():
+        for line in out.read_text(encoding="utf-8").splitlines():
             try:
                 m = json.loads(line)["meta"]
                 done.add((m["source"], m["task"], m.get("chunk", 0)))
@@ -376,13 +376,13 @@ def main() -> int:
     units = [
         (path, kind, i, text)
         for path, kind in sources()
-        for i, text in enumerate(chunk(path.read_text(errors="replace")))
+        for i, text in enumerate(chunk(path.read_text(errors="replace", encoding="utf-8")))
     ]
     if args.limit:
         units = units[: args.limit]
 
     written = 0
-    with out.open("a") as fh:
+    with out.open("a", encoding="utf-8") as fh:
         for path, kind, idx, text in units:
             rel = str(path.relative_to(ROOT))
             for task, weight in TASKS.items():

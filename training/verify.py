@@ -40,7 +40,7 @@ def real_paths() -> set[str]:
 
 
 def make_targets() -> set[str]:
-    text = (ROOT / "Makefile").read_text()
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
     return {m for line in text.splitlines()
             if (m := line.split(":")[0].strip())
             and not line.startswith(("\t", "#", " "))
@@ -142,7 +142,7 @@ def main() -> int:
     reasons: Counter[str] = Counter()
     discarded: list[dict] = []
 
-    for line in Path(args.input).read_text().splitlines():
+    for line in Path(args.input).read_text(encoding="utf-8").splitlines():
         try:
             rec = json.loads(line)
         except json.JSONDecodeError:
@@ -170,8 +170,8 @@ def main() -> int:
     total = len(kept) + len(discarded)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("".join(json.dumps(r) + "\n" for r in kept))
-    Path(args.report).write_text("".join(json.dumps(d) + "\n" for d in discarded))
+    out.write_text("".join(json.dumps(r) + "\n" for r in kept), encoding="utf-8")
+    Path(args.report).write_text("".join(json.dumps(d) + "\n" for d in discarded), encoding="utf-8")
 
     print(f"kept      {len(kept):6}")
     print(f"discarded {len(discarded):6}"

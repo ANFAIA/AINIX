@@ -101,7 +101,7 @@ def load_prompts(train_csv: Path, test_csv: Path, limit: int,
     for path in already:
         if not path.exists():
             continue
-        for line in path.read_text().splitlines():
+        for line in path.read_text(encoding="utf-8").splitlines():
             try:
                 have.add(json.loads(line)["messages"][1]["content"].strip().lower())
             except Exception:
@@ -157,7 +157,7 @@ def main() -> int:
     kept = {"equivalent": 0, "reference-anchored": 0, "dropped": 0}
 
     # Append: a stopped run keeps what it earned.
-    with out.open("a") as fh:
+    with out.open("a", encoding="utf-8") as fh:
         for start in range(0, len(rows), args.chunk):
             chunk = rows[start:start + args.chunk]
 
