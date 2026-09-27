@@ -25,6 +25,7 @@
         ./nix/services/runner.nix
         ./nix/services/agentd.nix
         ./nix/services/agents.nix
+        ./nix/services/core.nix
         ./nix/services/selftest.nix
         ./nix/services/firstboot.nix
         (./nix/profiles + "/${profile}.nix")

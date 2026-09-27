@@ -47,6 +47,10 @@ in
       sleep 3
 
       check "agentd is active" "systemctl is-active --quiet ainix-agentd"
+      check "the OS core target is up (runner, agentd, Laya)" \
+        "systemctl is-active --quiet ainix-core.target"
+      check "Laya starts with the core, before other agents" \
+        "systemctl show -p Before --value ainix-agent-system-laya | grep -q ainix-agents.target"
       ${lib.concatMapStrings (u: ''
         check "${u} is active" "systemctl is-active --quiet ${u}"
       '') expected}
@@ -71,7 +75,7 @@ in
         "curl -fsS http://127.0.0.1:${toString config.ainix.runner.port}/health"
       check "agent units may open Unix sockets only" \
         "systemctl show -p RestrictAddressFamilies ainix-agent-app-shell-expert | grep -qx 'RestrictAddressFamilies=AF_UNIX'"
-      check "console -> shell-expert -> model, end to end" \
+      check "console -> Laya -> shell-expert -> model, end to end" \
         "sudo -u ainix-user-shell AINIX_SOCK=${cfg.socket} PYTHONPATH=${cfg.root}/agents/lib ${py} ${cfg.root}/agents/system/agentd/e2e.py ${cfg.root}"
       ''}
       # Nothing classified may live in the store: every process can read it.

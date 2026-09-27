@@ -395,7 +395,8 @@ async def laya_decide(caller: str, request: str, cands: list[dict]) -> dict:
             pass
     from laya_route import core, keyword_pick
     best, score = keyword_pick(request, cands)
-    pick, source = core.decide(None, 0, best, score, 1.0)
+    only = cands[0]["name"] if len(cands) == 1 else None
+    pick, source = core.decide(None, 0, best, score, 1.0, only)
     skill = next((c["skills"][0] for c in cands if c["name"] == pick and c["skills"]), None)
     return {"agent": pick, "skill": skill, "source": f"{source} (laya not running)",
             "keyword_pick": best, "keyword_score": score, "engine": str(core.engine())}

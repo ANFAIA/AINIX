@@ -148,7 +148,9 @@ while True:
     if not line:
         break
     try:
-        print(a.peer("app/shell-expert").task("shell.ask", line))
+        r = a.ask(line)
+        print(a.render(r["output"]))
+        print(f"  [{r['routed_to']} — chosen by laya: {r['decision'].get('source')}]")
     except Exception as e:
         print(f"refused: {e}")
 '

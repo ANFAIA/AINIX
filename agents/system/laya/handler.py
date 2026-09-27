@@ -57,9 +57,11 @@ def handle(agent, task) -> dict:
     t0 = time.monotonic()
     req = task["input"]["request"]
     cands = ordered(task["input"]["candidates"])
+    only = cands[0]["name"] if len(cands) == 1 else None
     kw, kw_score = keyword_pick(req, cands)
-    mp, conf = model_pick(agent, req, cands)
-    pick, source = core.decide(mp, conf, kw, kw_score, THRESHOLD)
+    # One candidate: no model call at all — there is nothing to choose.
+    mp, conf = (None, 0.0) if only else model_pick(agent, req, cands)
+    pick, source = core.decide(mp, conf, kw, kw_score, THRESHOLD, only)
     skill = next((c.get("skills", [""])[0] for c in cands if c["name"] == pick), None)
     return {"agent": pick, "skill": skill, "source": str(source),
             "model_pick": mp, "confidence": round(conf, 2),

@@ -11,7 +11,14 @@ import sys
 from ainix_agent import Agent
 
 shell = Agent.from_manifest(sys.argv[1] + "/agents/user/shell/agent.toml")
-out = shell.peer("app/shell-expert").task("shell.ask", "list files", timeout=120)
+# Through the OS's decision layer, not straight to a named peer: the console
+# says what it wants, Laya decides who answers, agentd enforces the choice.
+r = shell.ask("list files", timeout=120)
+decision = r["decision"]
+if r["routed_to"] != "app/shell-expert" or "laya not running" in str(decision.get("source")):
+    raise SystemExit(f"not routed by laya: {r['routed_to']} {decision}")
+print("routed by laya:", decision.get("source"), decision.get("engine"))
+out = r["output"]
 if not isinstance(out, dict):
     raise SystemExit(f"unexpected reply: {out!r}")
 if "raw" in out or "command" in out:        # the model answered, JSON or not

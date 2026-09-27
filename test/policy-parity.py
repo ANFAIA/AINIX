@@ -61,10 +61,10 @@ texts = ["", "list files", "find competitor pricing changes",
          "Ünïcödé wörds ñandú 2026 roadmap", "a-b_c.d/e", "pricing pricing pricing"]
 for r, c in itertools.product(texts, repeat=2):
     same_laya("keyword_score", r, c)
-for mp, mc, kp, ks, t in itertools.product(
+for mp, mc, kp, ks, t, only in itertools.product(
         [None, "app/a", "app/b"], [0.0, 0.59, 0.6, 1.0], [None, "app/a", "app/b"],
-        [0, 1, 3], [0.6]):
-    same_laya("decide", mp, mc, kp, ks, t)
+        [0, 1, 3], [0.6], [None, "app/a"]):
+    same_laya("decide", mp, mc, kp, ks, t, only)
 
 for fn, args, a, b in bad[:20]:
     print(f"DISAGREE {fn}{args!r}: mojo={a!r} python={b!r}")

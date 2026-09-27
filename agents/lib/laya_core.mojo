@@ -59,7 +59,7 @@ def keyword_score(request: PythonObject, card_text: PythonObject) raises -> Pyth
 def decide(
     model_pick: PythonObject, model_conf: PythonObject,
     kw_pick: PythonObject, kw_score: PythonObject,
-    threshold: PythonObject,
+    threshold: PythonObject, only: PythonObject,
 ) raises -> PythonObject:
     """Whose choice stands. Returns (pick, source) with source one of
     "model", "agree", "keyword", "none".
@@ -68,7 +68,15 @@ def decide(
     - model confident (>= threshold)     -> model's pick, "model"
     - model unsure, keyword has evidence -> keyword's pick, "keyword"
     - neither                            -> None, "none": say so, do not guess
-    A model pick of None (no model, or it failed) counts as unsure."""
+    A model pick of None (no model, or it failed) counts as unsure.
+
+    `only` is the name of the sole candidate when there is exactly one, else
+    None. Then there is nothing to decide: the caller's grants already narrowed
+    the choice to one agent, and a model forced by the schema to name it has no
+    real confidence to report — a 135M model said "unsure" and the OS shell
+    refused to answer "list files". Returns (only, "only")."""
+    if only is not None:
+        return Python.tuple(only, PythonObject("only"))
     var conf = Float64(py=model_conf) if model_pick is not None else 0.0
     var score = Int(py=kw_score) if kw_pick is not None else 0
     var t = Float64(py=threshold)

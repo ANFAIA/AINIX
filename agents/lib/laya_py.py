@@ -31,7 +31,9 @@ def keyword_score(request, card_text) -> int:
     return score
 
 
-def decide(model_pick, model_conf, kw_pick, kw_score, threshold):
+def decide(model_pick, model_conf, kw_pick, kw_score, threshold, only):
+    if only is not None:
+        return (only, "only")
     conf = float(model_conf) if model_pick is not None else 0.0
     score = int(kw_score) if kw_pick is not None else 0
     if model_pick is not None and kw_pick is not None and model_pick == kw_pick:

@@ -67,6 +67,15 @@ they could not go (tested).
 - candidates are sorted and a keyword tie counts as no evidence, so the same
   request routes the same way every time.
 
+**Laya is part of the operating system**, not one agent among many.
+`nix/services/core.nix` defines `ainix-core.target` — model runner, agentd and
+Laya — which comes up before any other agent. The login shell and the `ainix`
+console do not name the agent that should answer: input that is not a command
+goes to `ask`, and the core decides. Laya still runs under its own uid and
+agentd's rules; being part of the core changes when it starts and what depends
+on it, not what it may do. When the caller may use exactly one agent there is
+nothing to decide, and Laya routes there without asking the model.
+
 If Laya is down, agentd runs Laya's model-free half itself: routing degrades,
 it does not stop. Measured on 24 labelled requests over ACME's six app agents
 (`test/laya-eval.py`): keyword alone 14/24, Laya 21/24, identical across three
