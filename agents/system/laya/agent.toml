@@ -1,0 +1,37 @@
+[agent]
+name       = "laya"
+tier       = "system"
+group      = "platform"
+domain     = "the decision layer: which agent, which skill, which model answers a request"
+version    = "0.1.0"
+entrypoint = "main.mojo"
+
+# The small model is Laya's brain, used narrowly: one constrained choice per
+# request, never free text. Laya decides; agentd enforces. Laya cannot grant
+# anything — it only ever chooses among candidates agentd says the caller may
+# already use, and agentd checks the choice before acting on it.
+models = ["qwen3.5-0.8b"]
+tools  = []
+skills = []
+peers  = []
+
+# Laya reads agent cards, never documents. In a deployment with classified
+# documents it holds the lowest clearance there is.
+[documents]
+clearance = "public"
+
+[quota]
+memory = "512Mi"
+cpu    = "1"
+gpu    = "0"
+
+[card]
+description = "Chooses which agent and skill should answer a request, from the ones the caller may use. The ART/JVM of AINIX."
+skills      = ["laya.decide"]
+inputs      = "json"
+outputs     = "json"
+
+[evolution]
+mode   = "frozen"
+allow  = []
+review = "required"

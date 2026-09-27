@@ -10,7 +10,7 @@ NAME        ?= ainix-runner   # the runner container; agents use AGENT=
 HF_CACHE    ?= $(HOME)/.cache/huggingface
 MAX_CACHE   ?= $(HOME)/.cache/ainix/max
 
-.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check runner-check mojo-policy
+.PHONY: image run stop logs smoke bench clean agent-new agent-check agents models fetch firstboot os-eval os-build os-boot skills example-check policy lint mojo-build test test-full boot-check runner-check mojo-policy laya-eval
 
 image:
 ifeq ($(ENGINE),max)
@@ -186,3 +186,8 @@ mojo-policy:
 	AINIX_POLICY=mojo PY=$(MOJO_PY) ./test/clearance-policy.sh
 
 test-full: test mojo-build mojo-policy os-eval runner-check boot-check
+
+# Does Laya route to the right agent? Needs a runner serving the small model:
+#   make run PORT=8090 GGUF=Qwen3.5-0.8B-Q4_K_M.gguf && make laya-eval PORT=8090
+laya-eval:
+	python3 test/laya-eval.py --runner http://127.0.0.1:$(PORT)

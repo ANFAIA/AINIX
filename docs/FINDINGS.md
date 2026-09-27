@@ -998,3 +998,36 @@ The image still uses the Python twin: no Mojo toolchain in nixpkgs. Two Mojo
 1.0 facts the modular/skills guide gets wrong or omits: a `comptime` list of
 Strings cannot be indexed at run time (it is not ImplicitlyCopyable), and there
 is no `Python.len` — use `obj.__len__()`.
+
+## Laya: a decision layer, with the small model as a chooser — 2026-09-27
+
+Laya is the layer that decides which agent and skill answer a request — the
+ART/JVM of the Android picture. The small model makes one constrained choice
+(a JSON-schema enum of the candidates, temperature 0, thinking off, 48 tokens);
+`laya_core.mojo` merges that with a model-free keyword score. agentd supplies
+only candidates the caller may already use and refuses any other choice.
+
+On 24 labelled requests over ACME's six app agents, phrased the way a person
+would rather than by copying card text:
+
+| | routed correctly |
+|---|---|
+| keyword only (Laya down) | 14/24 |
+| **Laya** | **21/24**, median decision ~0.9 s |
+
+**The first measurement was not repeatable**: keyword scored 15, then 14, with
+nothing changed. Candidates arrived in registration order, so a keyword tie went
+to whichever stub started first and the model saw the list in a different order
+each run. Candidates are now sorted, and a tie at the top score counts as no
+evidence. Three runs since: identical.
+
+**Cards decide routing.** Two of the early misses were `librarian`, whose card
+described its mechanism — "brokers every read against the requester's
+clearance" — rather than what it does for someone: find a document. A card is
+read by the router as much as by a reviewer. The cards were not tuned to the
+eval set; that would measure the tuning.
+
+Security: a Laya stub that always picks `system/firstboot` is refused by
+agentd — "laya chose 'system/firstboot', which you may not use" — and with
+Laya stopped, `ask` still routes on keywords. Both in `test/agent-policy.sh`,
+now 26 assertions.

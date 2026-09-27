@@ -45,6 +45,33 @@ and agentd accepts a name only from that uid, read from the kernel with
 an agent whose uid it does not have. In development the mode is `name`, and
 every registration's audit line says `UNBOUND`.
 
+## Laya — the decision layer
+
+Laya (`agents/system/laya`) is the ART/JVM of AINIX: the layer that decides
+**what** runs for a request. A caller says what it wants (`agent.ask(...)`);
+agentd collects the live agents that caller may already task, and Laya picks
+one of them and the skill to use. **Laya decides; agentd enforces.** The
+candidates are exactly what the caller could reach anyway, Laya's choice is
+checked against them before anything is forwarded, and the forwarded task runs
+under the caller's identity — a subverted Laya cannot route anyone somewhere
+they could not go (tested).
+
+**How the small model is used** — narrowly, as a chooser, never a writer:
+
+- one constrained decision: a JSON schema whose `agent` field is an enum of the
+  candidates' names, so a 0.8B model cannot invent an agent;
+- temperature 0, thinking off, 48 tokens — a routing decision is a lookup;
+- its confidence is advisory. `laya_core.mojo` merges it with a model-free
+  keyword score: agreement wins, a confident model (≥ 0.6) wins, an unsure one
+  yields to keyword evidence, and with neither Laya says nobody here can help;
+- candidates are sorted and a keyword tie counts as no evidence, so the same
+  request routes the same way every time.
+
+If Laya is down, agentd runs Laya's model-free half itself: routing degrades,
+it does not stop. Measured on 24 labelled requests over ACME's six app agents
+(`test/laya-eval.py`): keyword alone 14/24, Laya 21/24, identical across three
+runs, median decision ~0.9 s on a loaded M5.
+
 ## Enforcement — where each rule lives
 
 | Layer | When | What it refuses |

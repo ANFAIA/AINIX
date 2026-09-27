@@ -155,6 +155,15 @@ class Agent:
         disclosure too."""
         return self._conn.call("documents")["documents"]
 
+    def ask(self, request: str, timeout: float = 300) -> dict:
+        """Say what you want; Laya picks who answers. Returns the answer plus
+        where it went and why (`routed_to`, `decision`). Only agents this agent
+        may already call are ever considered."""
+        r = self._conn.call("ask", request=request, timeout=timeout,
+                            sock_timeout=timeout + 40)
+        return {"output": r["output"], "routed_to": r["routed_to"],
+                "decision": r["decision"]}
+
     def discover(self, skill: str) -> list[dict]:
         """Find agents by what they can do, not by where they live."""
         return self._conn.call("discover", skill=skill)["cards"]

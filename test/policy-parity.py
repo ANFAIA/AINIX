@@ -12,6 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agents/lib"))
 import ainix_policy as mojo      # noqa: E402
 import policy_py as py           # noqa: E402
+import laya_core as laya_mojo    # noqa: E402
+import laya_py                   # noqa: E402
 
 assert str(mojo.engine()) == "mojo"
 tiers = ["user", "app", "system", "", "root", "User", "app "]
@@ -44,6 +46,25 @@ for order in orders:
         same("classify", lab, order)
 for v, lo, hi in itertools.product([-5, 0, 1, 512, 4096, 10**9, 2.5], [1], [4096]):
     same("clamp", v, lo, hi)
+
+# Laya's deterministic core.
+def same_laya(fn, *args):
+    global cases
+    cases += 1
+    a, b = getattr(laya_mojo, fn)(*args), getattr(laya_py, fn)(*args)
+    if (tuple(a) if isinstance(a, tuple) else a) != (tuple(b) if isinstance(b, tuple) else b):
+        bad.append(("laya." + fn, args, a, b))
+
+texts = ["", "list files", "find competitor pricing changes",
+         "Tracks competitor releases, pricing, and positioning",
+         "Draft a LinkedIn post about the Q3 launch!!", "draft drafts drafting",
+         "Ünïcödé wörds ñandú 2026 roadmap", "a-b_c.d/e", "pricing pricing pricing"]
+for r, c in itertools.product(texts, repeat=2):
+    same_laya("keyword_score", r, c)
+for mp, mc, kp, ks, t in itertools.product(
+        [None, "app/a", "app/b"], [0.0, 0.59, 0.6, 1.0], [None, "app/a", "app/b"],
+        [0, 1, 3], [0.6]):
+    same_laya("decide", mp, mc, kp, ks, t)
 
 for fn, args, a, b in bad[:20]:
     print(f"DISAGREE {fn}{args!r}: mojo={a!r} python={b!r}")

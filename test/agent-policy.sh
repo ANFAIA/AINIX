@@ -16,7 +16,8 @@ PY=${PY:-python3}
 $PY agents/system/agentd/agentd.py 2>"$TMP/agentd-policy.log" &
 AGENTD=$!
 STUB=
-trap 'kill $AGENTD $STUB 2>/dev/null; rm -f "$AINIX_SOCK"' EXIT
+EVIL=
+trap 'kill $AGENTD $STUB $EVIL 2>/dev/null; rm -f "$AINIX_SOCK"' EXIT
 # Ready means accepting connections. A socket FILE can be left over from a
 # killed run, and testing for it (-S) raced the broker's startup.
 for _ in $(seq 100); do
@@ -140,6 +141,26 @@ check "a live name cannot be taken over"           deny \
   "load('$EXPERT_M')"                                "already registered by another connection"
 check "nobody may answer a task sent to another"   deny \
   "load('$SHELL_M')._conn.call('reply', task_id='t1', output='forged')" "no such task for you"
+
+# A Laya that has been subverted: whatever the request, it picks an agent the
+# caller may not use. agentd must refuse the route, not follow it.
+$PY -c "
+import sys; sys.path.insert(0,'agents/lib')
+from ainix_agent import Agent
+a = Agent.from_manifest('agents/system/laya/agent.toml')
+while True:
+    t = a.next_task()
+    if t is None: break
+    a.reply(t, {'agent': 'system/firstboot', 'skill': 'x', 'source': 'model'})
+" 2>/dev/null &
+EVIL=$!
+sleep 0.8
+check "a subverted Laya cannot route past policy"  deny \
+  "load('$SHELL_M').ask('list files')"             "which you may not use"
+kill $EVIL 2>/dev/null; wait $EVIL 2>/dev/null
+sleep 0.3
+check "with Laya down, routing falls back, not off" allow \
+  "r = load('$SHELL_M').ask('translate shell intent into a command explain'); assert r['routed_to']=='app/shell-expert', r"
 
 kill $STUB 2>/dev/null; wait $STUB 2>/dev/null; STUB=
 sleep 0.5

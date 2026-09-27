@@ -333,9 +333,17 @@ def loaded_model() -> str | None:
 
 
 def infer(model: str, messages: list, thinking: bool = False,
-          max_tokens: int = 512) -> str:
+          max_tokens: int = 512, temperature: float | None = None,
+          response_format: dict | None = None) -> str:
     body = {"model": model, "messages": messages, "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": bool(thinking)}}
+    if temperature is not None:
+        body["temperature"] = float(policy.clamp(float(temperature), 0.0, 2.0))
+    # Constrained decoding: the runner generates only text matching the schema.
+    # Laya relies on it to make the small model choose from a list rather than
+    # invent a name.
+    if isinstance(response_format, dict):
+        body["response_format"] = response_format
     req = urllib.request.Request(f"{RUNNER}/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
@@ -354,6 +362,43 @@ def infer(model: str, messages: list, thinking: bool = False,
 
 
 # --------------------------------------------------------------------------
+
+
+LAYA = "system/laya"
+
+
+async def dispatch_task(sender: str, callee: str, skill: str, payload,
+                        timeout: float):
+    """Queue a task for `callee` from `sender` and wait for its answer."""
+    tid = REG.next_id()
+    fut = asyncio.get_running_loop().create_future()
+    REG.pending[tid] = (fut, callee)
+    await REG.inbox[callee].put({"id": tid, "from": sender, "skill": skill,
+                                 "input": payload})
+    try:
+        return await asyncio.wait_for(
+            fut, timeout=float(policy.clamp(timeout, 1.0, MAX_TASK_SECONDS)))
+    finally:
+        REG.pending.pop(tid, None)
+
+
+async def laya_decide(caller: str, request: str, cands: list[dict]) -> dict:
+    """Ask Laya. If Laya is not running, decide with its model-free half
+    directly — routing degrades to keywords, it does not stop."""
+    if LAYA in REG.agents:
+        try:
+            d = await dispatch_task(caller, LAYA, "laya.decide",
+                                    {"request": request, "candidates": cands}, 30)
+            if isinstance(d, dict):
+                return d
+        except (asyncio.TimeoutError, ConnectionError):
+            pass
+    from laya_route import core, keyword_pick
+    best, score = keyword_pick(request, cands)
+    pick, source = core.decide(None, 0, best, score, 1.0)
+    skill = next((c["skills"][0] for c in cands if c["name"] == pick and c["skills"]), None)
+    return {"agent": pick, "skill": skill, "source": f"{source} (laya not running)",
+            "keyword_pick": best, "keyword_score": score, "engine": str(core.engine())}
 
 
 async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -477,7 +522,8 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
             content = await asyncio.to_thread(
                 infer, msg["model"], msg["messages"],
                 msg.get("thinking", False),
-                int(policy.clamp(int(msg.get("max_tokens", 512)), 1, MAX_TOKENS)))
+                int(policy.clamp(int(msg.get("max_tokens", 512)), 1, MAX_TOKENS)),
+                msg.get("temperature"), msg.get("response_format"))
             await send(w, ok=True, content=content)
 
     elif op == "task":
@@ -503,6 +549,45 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
                 await send(w, ok=False, error=f"{callee} did not answer in time")
             except ConnectionError as e:
                 await send(w, ok=False, error=str(e))
+
+    elif op == "ask":
+        # Intent in, answer out: Laya chooses which agent handles it. Laya
+        # decides; agentd enforces. The candidates are exactly the live agents
+        # THIS caller may task, Laya's choice is checked against them before
+        # anything is forwarded, and the forwarded task runs with the caller's
+        # identity — Laya cannot route anyone somewhere they could not go.
+        request = str(msg.get("request", ""))[:4000]
+        cands = sorted(({"name": n, "description": v["card"].get("description", ""),
+                         "skills": v["card"].get("skills", [])}
+                        for n, v in REG.agents.items()
+                        if n != LAYA and may_task(me, n)[0]),
+                       key=lambda c: c["name"])
+        if not cands:
+            audit(me, "ask", "-", False, "no agent this caller may use is running")
+            await send(w, ok=False, error="no agent you may use is running")
+            return me
+        decision = await laya_decide(me, request, cands)
+        pick = decision.get("agent")
+        if pick is None:
+            audit(me, "ask", "-", False, f"laya: nobody fits ({decision.get('source')})")
+            await send(w, ok=False, error="no agent here can do that", decision=decision)
+            return me
+        if pick not in {c["name"] for c in cands}:
+            audit(me, "ask", str(pick), False,
+                  "laya chose an agent this caller may not use — refused")
+            await send(w, ok=False, error=f"laya chose {pick!r}, which you may not use",
+                       decision=decision)
+            return me
+        audit(me, "ask", pick, True, f"laya: {decision.get('source')} "
+              f"(model {decision.get('model_pick')} @ {decision.get('confidence')}, "
+              f"keyword {decision.get('keyword_pick')}×{decision.get('keyword_score')})")
+        try:
+            out = await dispatch_task(me, pick, decision.get("skill") or "",
+                                      request, float(msg.get("timeout", 300)))
+            await send(w, ok=True, output=out, routed_to=pick, decision=decision)
+        except (asyncio.TimeoutError, ConnectionError) as e:
+            await send(w, ok=False, error=f"{pick}: {e or 'timed out'}",
+                       decision=decision)
 
     elif op == "next_task":
         # Wait for a task AND for the caller to leave. An agent blocked here

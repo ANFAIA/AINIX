@@ -25,3 +25,7 @@ clearance   = "confidential"
 [groups.documents]
 description = "Custody of ACME's documents and the memory built from them"
 clearance   = "restricted"
+
+[groups.platform]
+description = "The system's own decision layer — Laya. Routes requests; reads no documents"
+clearance   = "public"
