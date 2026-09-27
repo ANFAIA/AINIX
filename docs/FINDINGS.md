@@ -1031,3 +1031,49 @@ Security: a Laya stub that always picks `system/firstboot` is refused by
 agentd — "laya chose 'system/firstboot', which you may not use" — and with
 Laya stopped, `ask` still routes on keywords. Both in `test/agent-policy.sh`,
 now 26 assertions.
+
+## CLM against Laya — 2026-09-27
+
+[CLM](https://github.com/Contrastive-LM/CLM) is a "System One" decision model: a
+75 MB contrastive head over Qwen3-8B last-token embeddings that scores
+candidate actions against a state. Routing a request to an agent is exactly
+that task, so it was run against Laya on the same 24 labelled requests and six
+ACME candidates (`test/clm-vs-laya.py`), both on the M5's GPU through native
+llama.cpp.
+
+| decider | correct | median latency |
+|---|---|---|
+| CLM-v0.1-8B (Choice over the agent cards) | 12/24 | 397 ms |
+| **Laya** (Qwen3.5-0.8B, schema-constrained, + keyword) | **21/24** | 482 ms |
+| Laya with CLM as its chooser, same keyword merge | 14/24 | 397 ms |
+| either CLM or Laya right | 23/24 | — |
+
+**Laya is both more accurate and nearly as fast**, with a model a tenth the size
+and no second model to host: CLM needs an 8B encoder resident (8.7 GB at Q8_0)
+beside whatever the runner serves. For a distribution whose premise is keeping
+the minimum, that alone would decide it.
+
+What this does and does not show:
+
+- **Our setup is not CLM's reference setup.** The head was trained on vLLM
+  bf16 embeddings; ours are llama.cpp Q8_0 (the Docker VM's 8 GB could not hold
+  the model, so it ran natively on Metal). CLM's own README example reproduces
+  in *direction* — billing, very frustrated — but not in calibration: urgency
+  0.84 against the README's 0.41. The choices survive quantization; the
+  probabilities drift, which matters when a threshold acts on them.
+- **Six candidates is not CLM's strong case.** Its claimed advantage is large
+  candidate sets and actions reused across states, where cached action
+  embeddings make each decision cheap. An OS with dozens of agents, or tool
+  selection over hundreds of tools, is a fairer test than this one.
+- CLM's misses cluster on agents whose cards describe what they do rather than
+  what a person asks for (market, article-scout, librarian) — the same card
+  weakness Laya showed earlier, felt harder by a pure similarity model with no
+  instruction-following to bridge the gap.
+- They fail on different requests: one or the other is right 23/24 times. That
+  complementarity did not turn into a better merge — CLM as Laya's chooser
+  scored 14/24 — because CLM's probabilities are confident when wrong (p=0.87 on
+  a miss), so the confidence threshold cannot separate its good calls from its
+  bad ones.
+
+Laya stays as it is. CLM is worth revisiting with a GPU, bf16 embeddings, and a
+larger candidate set.
