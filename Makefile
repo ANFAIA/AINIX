@@ -179,8 +179,13 @@ runner-check:
 # on every enumerable input, then the full policy suites run with the Mojo
 # engine made mandatory (AINIX_POLICY=mojo fails if it cannot be imported).
 MOJO_PY ?= $(dir $(MOJO))python
+# Every extension module in agents/lib, not a hand-picked one: listing only
+# ainix_policy let CI fail on laya_core for as long as a stale local .so hid it.
 mojo-policy:
-	$(MOJO) build --emit shared-lib agents/lib/ainix_policy.mojo -o agents/lib/ainix_policy.so
+	@for f in agents/lib/*.mojo; do \
+	   echo "$(MOJO) build --emit shared-lib $$f"; \
+	   $(MOJO) build --emit shared-lib "$$f" -o "$${f%.mojo}.so" || exit 1; \
+	 done
 	$(MOJO_PY) test/policy-parity.py
 	AINIX_POLICY=mojo PY=$(MOJO_PY) ./test/agent-policy.sh
 	AINIX_POLICY=mojo PY=$(MOJO_PY) ./test/clearance-policy.sh
