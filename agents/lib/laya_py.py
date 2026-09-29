@@ -38,8 +38,8 @@ def decide(model_pick, model_conf, kw_pick, kw_score, threshold, only):
     score = int(kw_score) if kw_pick is not None else 0
     if model_pick is not None and kw_pick is not None and model_pick == kw_pick:
         return (model_pick, "agree")
-    if model_pick is not None and conf >= float(threshold):
-        return (model_pick, "model")
+    if model_pick is not None:
+        return (model_pick, "model" if conf >= float(threshold) else "model-unsure")
     if kw_pick is not None and score >= 1:
         return (kw_pick, "keyword")
     return (None, "none")

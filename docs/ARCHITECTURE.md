@@ -61,11 +61,27 @@ they could not go (tested).
 - one constrained decision: a JSON schema whose `agent` field is an enum of the
   candidates' names, so a 0.8B model cannot invent an agent;
 - temperature 0, thinking off, 48 tokens — a routing decision is a lookup;
-- its confidence is advisory. `laya_core.mojo` merges it with a model-free
-  keyword score: agreement wins, a confident model (≥ 0.6) wins, an unsure one
-  yields to keyword evidence, and with neither Laya says nobody here can help;
-- candidates are sorted and a keyword tie counts as no evidence, so the same
-  request routes the same way every time.
+- **confidence comes from its token probabilities**, renormalised over the
+  candidates at the first token where their names diverge — not from the number
+  it writes in its JSON, which did not separate right answers from wrong ones;
+- **when it is unsure (< 0.7), Laya escalates** to the next model it holds a
+  grant for (Qwen3-8B). A small model that knows when it does not know, backed by
+  a big one that is asked only then;
+- the model's pick stands. Keyword evidence is used only when no model answered:
+  letting it override an unsure model made routing worse, measured.
+
+| | dev | held-out | escalated |
+|---|---|---|---|
+| keyword only | 14/24 | — | — |
+| Qwen3.5-0.8B alone | 21/24 | 19/24 | — |
+| Qwen3-8B alone | 24/24 | 24/24 | all (≈2 s each) |
+| **Laya cascade** | **23/24** | **24/24** | 8/24 and 13/24 |
+
+The held-out set (`test/laya_heldout.py`) was written and committed before any
+of these changes and not edited after. agentd reports the weights that answered
+each inference, and Laya refuses an "escalation" that reached the same weights —
+on a one-runner machine both model names hit one model, and the audit log must
+not claim otherwise.
 
 **Laya is part of the operating system**, not one agent among many.
 `nix/services/core.nix` defines `ainix-core.target` — model runner, agentd and

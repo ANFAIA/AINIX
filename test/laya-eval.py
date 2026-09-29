@@ -23,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ACME = ROOT / "examples/acme"
 sys.path.insert(0, str(ROOT / "agents/lib"))
+sys.path.insert(0, str(ROOT / "test"))
 
 CASES = [
     ("Write something for our LinkedIn about the new export feature", "app/social-media"),
@@ -72,10 +73,11 @@ def wait_socket(path: str) -> None:
     raise SystemExit("agentd did not come up")
 
 
-def run(label: str, with_laya: bool, env: dict) -> list[bool]:
+def run(label: str, with_laya: bool, env: dict, cases=None) -> list[bool]:
+    cases = cases or CASES
     from ainix_agent import Agent
     procs = []
-    for n in {e for _, e in CASES}:
+    for n in {e for _, e in cases}:
         m = ACME / "agents" / n / "agent.toml"
         procs.append(subprocess.Popen([sys.executable, "-c", STUB.format(
             lib=str(ROOT / "agents/lib"), manifest=str(m))], env=env))
@@ -87,11 +89,13 @@ def run(label: str, with_laya: bool, env: dict) -> list[bool]:
     time.sleep(1.5)
     console = Agent.from_manifest(str(ACME / "agents/user/console/agent.toml"))
     hits, rows, ms = [], [], []
-    for req, want in CASES:
+    esc = 0
+    for req, want in cases:
         try:
             r = console.ask(req, timeout=60)
             got, d = r["routed_to"], r["decision"]
-            how = d.get("source")
+            how = d.get("source") + (" [8b]" if d.get("escalated") else "")
+            esc += bool(d.get("escalated"))
             if "ms" in d:
                 ms.append(d["ms"])
         except Exception as e:
@@ -102,7 +106,8 @@ def run(label: str, with_laya: bool, env: dict) -> list[bool]:
         p.terminate()
     ok = sum(hits)
     lat = f", decision median {sorted(ms)[len(ms) // 2]} ms" if ms else ""
-    print(f"\n{label}: {ok}/{len(CASES)} routed correctly{lat}")
+    print(f"\n{label}: {ok}/{len(cases)} routed correctly{lat}"
+          + (f", escalated {esc}/{len(cases)}" if with_laya else ""))
     for good, req, want, got, how in rows:
         if not good:
             print(f"   miss  {req[:52]:<52} want {want:<18} got {str(got):<18} {how}")
@@ -112,20 +117,25 @@ def run(label: str, with_laya: bool, env: dict) -> list[bool]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runner", required=True)
+    ap.add_argument("--runners", default="{}",
+                    help='JSON model->url, e.g. {"qwen3-8b": "http://127.0.0.1:8099"}')
     args = ap.parse_args()
     sock = os.path.join(tempfile.gettempdir(), f"laya-eval-{os.getpid()}.sock")
     env = dict(os.environ, AINIX_SOCK=sock, AINIX_ROOT=str(ACME),
-               AINIX_RUNNER=args.runner, PYTHONPATH=str(ROOT / "agents/lib"))
+               AINIX_RUNNER=args.runner, AINIX_RUNNERS=args.runners, PYTHONPATH=str(ROOT / "agents/lib"))
     os.environ.update(env)
     agentd = subprocess.Popen([sys.executable, str(ROOT / "agents/system/agentd/agentd.py")],
                               env=env, stderr=open(sock + ".log", "w"))
     try:
         wait_socket(sock)
-        kw = run("keyword only (Laya not running)", False, env)
-        ly = run("Laya: small model + keyword, merged", True, env)
+        from laya_heldout import HELDOUT
+        kw = run("keyword only (Laya not running), dev", False, env)
+        ly = run("Laya, dev", True, env)
+        ho = run("Laya, held-out", True, env, HELDOUT)
     finally:
         agentd.terminate()
-    print(f"\nkeyword {sum(kw)}/{len(kw)}  ->  Laya {sum(ly)}/{len(ly)}")
+    print(f"\nkeyword {sum(kw)}/{len(kw)}  ->  Laya dev {sum(ly)}/{len(ly)}, "
+          f"held-out {sum(ho)}/{len(ho)}")
     return 0
 
 

@@ -1077,3 +1077,37 @@ What this does and does not show:
 
 Laya stays as it is. CLM is worth revisiting with a GPU, bf16 embeddings, and a
 larger candidate set.
+
+## Laya 21/24 → 23/24 dev, 24/24 held-out — 2026-09-30
+
+To avoid tuning to cases whose misses had been read, a **held-out set** of 24
+was written and committed first (terse, indirect, typos, Spanish). Then one
+change at a time (`test/laya-experiments.py`, `test/laya-cascade.py`), kept only
+if it helped held-out:
+
+1. **The confidence the model writes is noise.** Mean confidence on right
+   answers minus wrong answers: +0.03 dev, +0.07 held-out. The probability it
+   puts on the chosen name at the first diverging token, renormalised over the
+   candidates: +0.23 / +0.42. The model knows when it does not know; it just
+   does not say so in words.
+2. **Keywords make it worse.** With the informative confidence, letting keyword
+   evidence override an unsure model dropped held-out from 19 to 15. The old
+   merge only looked harmless because the written confidence was always high
+   enough that keywords never got a say. The model's pick now stands; keywords
+   only when no model answered.
+3. **Escalate instead.** Below 0.7, ask Qwen3-8B (already on disk; no new
+   downloads). 8B alone is 24/24 on both sets but ~2 s per decision. The cascade
+   gets **23/24 dev and 24/24 held-out**, escalating 8 and 13 of 24 — held-out
+   escalates more because Spanish and typos are exactly where the 0.8B is
+   unsure. Measured end to end through agentd with two runners.
+4. Adding the manifest's `domain` line to candidate text: +1 held-out, 0 dev.
+   Within noise at n=24; not adopted.
+
+On a machine with **one** runner both model names reach the same weights.
+agentd now returns the name of the weights that answered each inference, and
+Laya refuses an escalation that reached the same ones — 0 fake escalations in
+the one-runner run, which scores 21/24 and 19/24, the small model alone.
+
+The remaining dev miss ("find the signed contract…" → competitors) is the 0.8B
+confident and wrong; the cascade cannot catch what the small model does not
+doubt. The next lever is training the small model on routing, not more rules.

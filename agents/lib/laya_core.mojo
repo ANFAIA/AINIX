@@ -61,20 +61,21 @@ def decide(
     kw_pick: PythonObject, kw_score: PythonObject,
     threshold: PythonObject, only: PythonObject,
 ) raises -> PythonObject:
-    """Whose choice stands. Returns (pick, source) with source one of
-    "model", "agree", "keyword", "none".
+    """Whose choice stands. Returns (pick, source).
 
-    - model and keyword agree            -> that pick, "agree"
-    - model confident (>= threshold)     -> model's pick, "model"
-    - model unsure, keyword has evidence -> keyword's pick, "keyword"
-    - neither                            -> None, "none": say so, do not guess
-    A model pick of None (no model, or it failed) counts as unsure.
+    Measured (docs/FINDINGS.md, 2026-09-30): keyword evidence is worse than the
+    model even when the model is unsure — letting it override an unsure model
+    cost 4 of 24 on held-out. So the model's pick stands whenever there is one;
+    confidence decides only whether Laya escalates to a bigger model first, and
+    that happens in the handler, before this is called.
 
-    `only` is the name of the sole candidate when there is exactly one, else
-    None. Then there is nothing to decide: the caller's grants already narrowed
-    the choice to one agent, and a model forced by the schema to name it has no
-    real confidence to report — a 135M model said "unsure" and the OS shell
-    refused to answer "list files". Returns (only, "only")."""
+    - exactly one candidate          -> it, "only"
+    - model and keyword agree        -> that pick, "agree"
+    - model picked, confident        -> model's pick, "model"
+    - model picked, unsure           -> model's pick, "model-unsure"
+    - no model answer, keyword hit   -> keyword's pick, "keyword"
+    - neither                        -> None, "none"
+    """
     if only is not None:
         return Python.tuple(only, PythonObject("only"))
     var conf = Float64(py=model_conf) if model_pick is not None else 0.0
@@ -84,8 +85,10 @@ def decide(
     if model_pick is not None and kw_pick is not None \
             and String(py=model_pick) == String(py=kw_pick):
         return Python.tuple(model_pick, PythonObject("agree"))
-    if model_pick is not None and conf >= t:
-        return Python.tuple(model_pick, PythonObject("model"))
+    if model_pick is not None:
+        if conf >= t:
+            return Python.tuple(model_pick, PythonObject("model"))
+        return Python.tuple(model_pick, PythonObject("model-unsure"))
     if kw_pick is not None and score >= 1:
         return Python.tuple(kw_pick, PythonObject("keyword"))
     return Python.tuple(none, PythonObject("none"))

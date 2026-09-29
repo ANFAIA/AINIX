@@ -53,6 +53,11 @@ ROOT = Path(os.environ.get("AINIX_ROOT", Path(__file__).resolve().parents[3]))
 SOCK = os.environ.get("AINIX_SOCK", "/run/ainix/agentd.sock")
 RUNNER = os.environ.get("AINIX_RUNNER", "http://127.0.0.1:8000")
 
+# More than one runner: {"qwen3-8b": "http://127.0.0.1:8001", ...}. A model not
+# listed goes to RUNNER. This is what lets Laya's small model and the model it
+# escalates to be served side by side.
+RUNNERS: dict[str, str] = json.loads(os.environ.get("AINIX_RUNNERS", "{}") or "{}")
+
 # Where classified documents live. NOT under ROOT on the image: ROOT is a Nix
 # store path, and the Nix store is readable by every process on the machine —
 # a document placed there is readable by any agent without asking agentd,
@@ -316,25 +321,32 @@ def find_skill(name: str) -> tuple[str, Path] | tuple[None, None]:
 # the model plane — agents never see this URL
 
 
-LOADED = {"name": None}
 
 
-def loaded_model() -> str | None:
-    """What the runner actually has open. There is one runner in v1, so a
-    grant for `gemma-3-1b` served by a runner holding Qwen would silently
-    answer from the wrong model — the grant is policy, the loaded weights are
-    fact, and the audit line has to show both."""
+_SERVED: dict[str, str | None] = {}
+
+
+def loaded_model(model: str | None = None) -> str | None:
+    """What the runner for `model` actually has open. A grant for `gemma-3-1b`
+    served by a runner holding Qwen would silently answer from the wrong model —
+    the grant is policy, the loaded weights are fact. Returned with every
+    inference so a caller can tell (Laya uses it to refuse a fake escalation:
+    two model names routed to the same runner are one model)."""
+    url = RUNNERS.get(model, RUNNER) if model else RUNNER
+    if _SERVED.get(url):
+        return _SERVED[url]
     try:
-        with urllib.request.urlopen(f"{RUNNER}/v1/models", timeout=5) as r:
+        with urllib.request.urlopen(f"{url}/v1/models", timeout=5) as r:
             m = json.load(r)["models"][0]
-        return Path(m.get("name", "")).name or None
+        _SERVED[url] = Path(m.get("name") or m.get("model") or "").name or None
+        return _SERVED[url]
     except Exception:
         return None
 
 
 def infer(model: str, messages: list, thinking: bool = False,
           max_tokens: int = 512, temperature: float | None = None,
-          response_format: dict | None = None) -> str:
+          response_format: dict | None = None, logprobs: int = 0) -> dict:
     body = {"model": model, "messages": messages, "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": bool(thinking)}}
     if temperature is not None:
@@ -344,7 +356,10 @@ def infer(model: str, messages: list, thinking: bool = False,
     # invent a name.
     if isinstance(response_format, dict):
         body["response_format"] = response_format
-    req = urllib.request.Request(f"{RUNNER}/v1/chat/completions",
+    if logprobs:
+        body["logprobs"] = True
+        body["top_logprobs"] = int(policy.clamp(int(logprobs), 1, 20))
+    req = urllib.request.Request(f"{RUNNERS.get(model, RUNNER)}/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     try:
@@ -358,7 +373,9 @@ def infer(model: str, messages: list, thinking: bool = False,
         except Exception:
             why = ""
         raise RuntimeError(f"runner answered {e.code}: {why or e.reason}") from None
-    return d["choices"][0]["message"].get("content") or ""
+    c = d["choices"][0]
+    return {"content": c["message"].get("content") or "",
+            "logprobs": (c.get("logprobs") or {}).get("content") if logprobs else None}
 
 
 # --------------------------------------------------------------------------
@@ -512,20 +529,21 @@ async def dispatch(msg: dict, me: str | None, w: asyncio.StreamWriter,
 
     elif op == "infer":
         ok, why = may_use_model(me, msg["model"])
-        served = LOADED["name"] or loaded_model()
-        LOADED["name"] = served
+        served = loaded_model(msg["model"])
         if ok and served and msg["model"].split("-")[0] not in served.lower():
             why += f" — WARNING: runner is serving {served}, not {msg['model']}"
         audit(me, "infer", msg["model"], ok, why)
         if not ok:
             await send(w, ok=False, error=why)
         else:
-            content = await asyncio.to_thread(
+            r = await asyncio.to_thread(
                 infer, msg["model"], msg["messages"],
                 msg.get("thinking", False),
                 int(policy.clamp(int(msg.get("max_tokens", 512)), 1, MAX_TOKENS)),
-                msg.get("temperature"), msg.get("response_format"))
-            await send(w, ok=True, content=content)
+                msg.get("temperature"), msg.get("response_format"),
+                int(msg.get("logprobs", 0) or 0))
+            await send(w, ok=True, content=r["content"], logprobs=r["logprobs"],
+                       served=served)
 
     elif op == "task":
         callee = msg["to"]

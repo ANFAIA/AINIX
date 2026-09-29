@@ -67,6 +67,17 @@ class Model:
                             sock_timeout=300, **kw)
         return r["content"]
 
+    def complete_with_logprobs(self, prompt: str, system: str = "", top: int = 20,
+                               **kw) -> tuple[str, list]:
+        """The answer and the model's per-token logprobs (top `top` each).
+        `self.served` then names the weights that actually answered."""
+        msgs = ([{"role": "system", "content": system}] if system else [])
+        msgs.append({"role": "user", "content": str(prompt)})
+        r = self._conn.call("infer", model=self.name, messages=msgs,
+                            logprobs=top, sock_timeout=300, **kw)
+        self.served = r.get("served")
+        return r["content"], r.get("logprobs") or []
+
     def complete_json(self, system: str, user: str, thinking: bool = False,
                       **kw) -> dict:
         """Reasoning models spend the whole budget in reasoning_content and

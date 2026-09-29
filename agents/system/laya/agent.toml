@@ -10,7 +10,9 @@ entrypoint = "main.mojo"
 # request, never free text. Laya decides; agentd enforces. Laya cannot grant
 # anything — it only ever chooses among candidates agentd says the caller may
 # already use, and agentd checks the choice before acting on it.
-models = ["qwen3.5-0.8b"]
+# Smallest first. The first decides; the second is asked only when the first's
+# own token probabilities say it is unsure (see handler.py, ESCALATE).
+models = ["qwen3.5-0.8b", "qwen3-8b"]
 tools  = []
 skills = []
 peers  = []
